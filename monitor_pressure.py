@@ -46,60 +46,38 @@ async def check_pressure():
             system_name = system.system_name
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            # Gather zone info
-            zones_info = []
-            for zone in system.zones:
-                zones_info.append(
-                    f"  {zone.name}: {zone.current_room_temperature}°C "
-                    f"(target: {zone.desired_room_temperature_setpoint}°C, "
-                    f"heating: {zone.heating_state})"
-                )
-
-            # Gather DHW info
-            dhw_info = []
-            for dhw in system.domestic_hot_water:
-                dhw_info.append(
-                    f"  DHW: {dhw.current_dhw_temperature}°C "
-                    f"(target: {dhw.tapping_setpoint}°C, mode: {dhw.operation_mode_dhw})"
-                )
-
             # Determine status
             if pressure is None:
                 status = "UNKNOWN"
-                status_line = "⚠️ WATER PRESSURE: UNKNOWN (could not read)"
+                status_line = "CISNIENIE WODY: nie mozna odczytac"
             elif pressure < PRESSURE_CRITICAL:
                 status = "CRITICAL"
-                status_line = f"🔴 WATER PRESSURE CRITICAL: {pressure:.2f} bar (threshold: {PRESSURE_CRITICAL} bar)"
+                status_line = f"CISNIENIE WODY KRYTYCZNE: {pressure:.2f} bar"
             elif pressure < PRESSURE_WARNING:
                 status = "WARNING"
-                status_line = f"🟡 WATER PRESSURE LOW: {pressure:.2f} bar (threshold: {PRESSURE_WARNING} bar)"
+                status_line = f"NISKIE CISNIENIE WODY: {pressure:.2f} bar"
             else:
                 status = "OK"
-                status_line = f"🟢 Water pressure OK: {pressure:.2f} bar"
+                status_line = f"Cisnienie OK: {pressure:.2f} bar"
 
-            report = f"""
-{'='*60}
-VAILLANT BOILER STATUS REPORT
-{'='*60}
-Time:               {now}
-System:             {system_name}
-Connected:          {connected}
+            report = (
+                f"{status_line}\n"
+                f"Temp. zewn.: {outdoor_temp}°C\n"
+                f"Temp. przeplywu: {flow_temp}°C\n"
+            )
+            for zone in system.zones:
+                report += (
+                    f"{zone.name}: {zone.current_room_temperature}°C "
+                    f"(cel: {zone.desired_room_temperature_setpoint}°C)\n"
+                )
+            for dhw in system.domestic_hot_water:
+                report += (
+                    f"CWU: {dhw.current_dhw_temperature}°C "
+                    f"(cel: {dhw.tapping_setpoint}°C)\n"
+                )
+            report += f"{now} | {system_name} | {'online' if connected else 'OFFLINE'}"
 
-{status_line}
-
---- System Readings ---
-Water Pressure:     {pressure} bar
-Outdoor Temp:       {outdoor_temp}°C
-Flow Temperature:   {flow_temp}°C
-
---- Zones ---
-{chr(10).join(zones_info) if zones_info else '  (no zones)'}
-
---- Hot Water ---
-{chr(10).join(dhw_info) if dhw_info else '  (no DHW)'}
-{'='*60}
-"""
-            return pressure, status, report.strip()
+            return pressure, status, report
 
     return None, "ERROR", "Could not retrieve any system data."
 

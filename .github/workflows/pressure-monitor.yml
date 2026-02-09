@@ -12,7 +12,7 @@ env:
   VAILLANT_PASSWORD: ${{ secrets.VAILLANT_PASSWORD }}
   VAILLANT_BRAND: vaillant
   VAILLANT_COUNTRY: poland
-  PRESSURE_WARNING: "3.0"  # TEMP TEST - normally 1.0
+  PRESSURE_WARNING: "1.0"
   PRESSURE_CRITICAL: "0.8"
   TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
   TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
@@ -36,26 +36,4 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Check boiler pressure
-        id: pressure
-        continue-on-error: true
         run: python monitor_pressure.py
-
-      - name: Send email alert if pressure is low
-        if: steps.pressure.outcome == 'failure'
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.SMTP_USERNAME }}
-          password: ${{ secrets.SMTP_PASSWORD }}
-          subject: "⚠️ VAILLANT: Low water pressure alert!"
-          to: konrad@makosa.org
-          from: ${{ secrets.SMTP_USERNAME }}
-          body: |
-            ALERT: Vaillant boiler water pressure is below threshold!
-
-            Check the full report at: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-            ---
-            This is an automated message from your Vaillant Pressure Monitor.
-            Thresholds: Warning < ${{ env.PRESSURE_WARNING }} bar, Critical < ${{ env.PRESSURE_CRITICAL }} bar
