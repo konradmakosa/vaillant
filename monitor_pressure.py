@@ -12,6 +12,7 @@ import logging
 from datetime import datetime
 
 from myPyllant.api import MyPyllantAPI
+from twilio.rest import Client as TwilioClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -118,11 +119,46 @@ def write_github_output(pressure, status, report):
             f.write(f"```\n{report}\n```\n")
 
 
+def send_whatsapp_alerts(report):
+    """
+    Send WhatsApp messages via Twilio to all configured family numbers.
+    WHATSAPP_RECIPIENTS should be comma-separated phone numbers, e.g. "+48123456789,+48987654321"
+    """
+    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+    from_number = os.environ.get("TWILIO_WHATSAPP_FROM", "+14155238886")  # Twilio sandbox default
+    recipients = os.environ.get("WHATSAPP_RECIPIENTS", "")
+
+    if not all([account_sid, auth_token, recipients]):
+        logger.warning("Twilio/WhatsApp not configured — skipping WhatsApp alerts.")
+        return
+
+    client = TwilioClient(account_sid, auth_token)
+    short_msg = report[:1600]  # WhatsApp message limit
+
+    for number in recipients.split(","):
+        number = number.strip()
+        if not number:
+            continue
+        try:
+            message = client.messages.create(
+                body=short_msg,
+                from_=f"whatsapp:{from_number}",
+                to=f"whatsapp:{number}",
+            )
+            logger.info(f"WhatsApp sent to {number}: SID {message.sid}")
+        except Exception as e:
+            logger.error(f"Failed to send WhatsApp to {number}: {e}")
+
+
 def main():
     pressure, status, report = asyncio.run(check_pressure())
 
     print(report)
     write_github_output(pressure, status, report)
+
+    if status in ("CRITICAL", "WARNING", "UNKNOWN"):
+        send_whatsapp_alerts(report)
 
     if status == "CRITICAL":
         logger.critical("Water pressure is critically low! Immediate action required.")

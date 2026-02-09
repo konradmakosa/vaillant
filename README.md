@@ -21,6 +21,10 @@ Add these secrets:
 | `VAILLANT_PASSWORD` | Your myVaillant password |
 | `SMTP_USERNAME` | Gmail address for sending alerts (e.g. your-alerts@gmail.com) |
 | `SMTP_PASSWORD` | Gmail App Password (NOT your regular password — see below) |
+| `TWILIO_ACCOUNT_SID` | Twilio Account SID (from console.twilio.com) |
+| `TWILIO_AUTH_TOKEN` | Twilio Auth Token |
+| `TWILIO_WHATSAPP_FROM` | Twilio sandbox number, e.g. `+14155238886` |
+| `WHATSAPP_RECIPIENTS` | Comma-separated phone numbers, e.g. `+48123456789,+48987654321` |
 
 ### Gmail App Password
 
@@ -28,6 +32,16 @@ Add these secrets:
 2. Select "Mail" and "Other (Custom name)" → name it "Vaillant Monitor"
 3. Copy the 16-character password → use it as `SMTP_PASSWORD`
 4. Requires 2FA enabled on the Gmail account
+
+### WhatsApp via Twilio (free trial)
+
+1. Sign up at https://www.twilio.com/try-twilio (free $15 credit)
+2. Go to **Messaging** → **Try it out** → **Send a WhatsApp message**
+3. Twilio gives you a sandbox number and a join code (e.g. `join bright-fox`)
+4. **Each family member** sends that join code to the sandbox number on WhatsApp — this subscribes them
+5. Copy **Account SID**, **Auth Token**, and **sandbox number** from the Twilio console
+6. Add them as GitHub Secrets (see table above)
+7. Set `WHATSAPP_RECIPIENTS` to all family phone numbers (with country code), comma-separated
 
 > **Tip:** You can use any SMTP server — just update `server_address` and `server_port` in `.github/workflows/pressure-monitor.yml`
 
