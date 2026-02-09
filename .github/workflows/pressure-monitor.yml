@@ -1,0 +1,57 @@
+name: Vaillant Pressure Monitor
+
+on:
+  schedule:
+    # Run every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    # Allow manual trigger from GitHub UI
+
+env:
+  VAILLANT_USERNAME: ${{ secrets.VAILLANT_USERNAME }}
+  VAILLANT_PASSWORD: ${{ secrets.VAILLANT_PASSWORD }}
+  VAILLANT_BRAND: vaillant
+  VAILLANT_COUNTRY: poland
+  PRESSURE_WARNING: "1.0"
+  PRESSURE_CRITICAL: "0.8"
+
+jobs:
+  check-pressure:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check boiler pressure
+        id: pressure
+        continue-on-error: true
+        run: python monitor_pressure.py
+
+      - name: Send email alert if pressure is low
+        if: steps.pressure.outcome == 'failure'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "⚠️ VAILLANT: Low water pressure alert!"
+          to: konrad@makosa.org
+          from: ${{ secrets.SMTP_USERNAME }}
+          body: |
+            ALERT: Vaillant boiler water pressure is below threshold!
+
+            Check the full report at: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ---
+            This is an automated message from your Vaillant Pressure Monitor.
+            Thresholds: Warning < ${{ env.PRESSURE_WARNING }} bar, Critical < ${{ env.PRESSURE_CRITICAL }} bar
