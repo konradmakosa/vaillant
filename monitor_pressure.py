@@ -102,31 +102,37 @@ def write_github_output(pressure, status, report):
 def send_pushover_alert(report, status):
     """
     Send push notification via Pushover API.
+    Supports multiple users via comma-separated PUSHOVER_USER_KEY.
     """
     token = os.environ.get("PUSHOVER_APP_TOKEN")
-    user = os.environ.get("PUSHOVER_USER_KEY")
+    users = os.environ.get("PUSHOVER_USER_KEY", "")
 
-    if not all([token, user]):
+    if not all([token, users]):
         logger.warning("Pushover not configured — skipping push notification.")
         return
 
     priority = 1 if status == "CRITICAL" else 0
+    title = "Vaillant: " + ("KRYTYCZNE!" if status == "CRITICAL" else "Niskie cisnienie")
 
-    data = urllib.parse.urlencode({
-        "token": token,
-        "user": user,
-        "title": "Vaillant: " + ("KRYTYCZNE!" if status == "CRITICAL" else "Niskie cisnienie"),
-        "message": report[:1024],
-        "priority": priority,
-        "sound": "siren" if status == "CRITICAL" else "pushover",
-    }).encode()
+    for user_key in users.split(","):
+        user_key = user_key.strip()
+        if not user_key:
+            continue
+        data = urllib.parse.urlencode({
+            "token": token,
+            "user": user_key,
+            "title": title,
+            "message": report[:1024],
+            "priority": priority,
+            "sound": "siren" if status == "CRITICAL" else "pushover",
+        }).encode()
 
-    try:
-        req = urllib.request.Request("https://api.pushover.net/1/messages.json", data=data)
-        with urllib.request.urlopen(req) as resp:
-            logger.info(f"Pushover sent: {resp.status}")
-    except Exception as e:
-        logger.error(f"Failed to send Pushover: {e}")
+        try:
+            req = urllib.request.Request("https://api.pushover.net/1/messages.json", data=data)
+            with urllib.request.urlopen(req) as resp:
+                logger.info(f"Pushover sent to {user_key[:8]}...: {resp.status}")
+        except Exception as e:
+            logger.error(f"Failed to send Pushover to {user_key[:8]}...: {e}")
 
 
 def main():
