@@ -214,7 +214,7 @@ def main():
             rows, info = asyncio.run(read_boiler_data())
             break
         except Exception as e:
-            if '403' in str(e) and 'Quota' in str(e) and attempt < max_retries - 1:
+            if ('403' in str(e) or '401' in str(e)) and attempt < max_retries - 1:
                 wait = 120 * (attempt + 1)
                 logger.warning(f"API quota exceeded, retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
                 time.sleep(wait)
