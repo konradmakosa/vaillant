@@ -27,7 +27,9 @@ CSV_HEADERS = [
     "timestamp",
     "water_pressure_bar",
     "outdoor_temp_c",
-    "flow_temp_c",
+    "circuit_flow_temp_c",
+    "energy_manager_state",
+    "circuit_state",
     "connected",
     "zone_name",
     "zone_current_temp_c",
@@ -52,8 +54,12 @@ async def read_boiler_data():
             now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
             pressure = system.water_pressure
             outdoor_temp = system.outdoor_temperature
-            flow_temp = system.system_flow_temperature
             connected = system.connected
+            energy_state = system.energy_manager_state
+
+            circuits = system.circuits if system.circuits else []
+            circuit_flow = circuits[0].current_circuit_flow_temperature if circuits else None
+            circuit_state = circuits[0].circuit_state if circuits else None
 
             zones = system.zones if system.zones else [None]
             dhw_list = system.domestic_hot_water if system.domestic_hot_water else [None]
@@ -64,7 +70,9 @@ async def read_boiler_data():
                         "timestamp": now,
                         "water_pressure_bar": pressure,
                         "outdoor_temp_c": outdoor_temp,
-                        "flow_temp_c": flow_temp,
+                        "circuit_flow_temp_c": circuit_flow,
+                        "energy_manager_state": energy_state,
+                        "circuit_state": circuit_state,
                         "connected": connected,
                         "zone_name": zone.name if zone else None,
                         "zone_current_temp_c": zone.current_room_temperature if zone else None,
@@ -110,7 +118,7 @@ def main():
         logger.info(
             f"P={row['water_pressure_bar']} bar | "
             f"Out={row['outdoor_temp_c']}°C | "
-            f"Flow={row['flow_temp_c']}°C | "
+            f"Flow={row['circuit_flow_temp_c']}°C | "
             f"{row['zone_name']}={row['zone_current_temp_c']}°C | "
             f"DHW={row['dhw_current_temp_c']}°C"
         )
