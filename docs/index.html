@@ -392,7 +392,7 @@ function parseCSV(text) {
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
         const vals = lines[i].split(',');
-        if (vals.length < headers.length) continue;
+        if (vals.length < 2) continue;
         const row = {};
         headers.forEach((h, idx) => {
             const v = vals[idx]?.trim();
