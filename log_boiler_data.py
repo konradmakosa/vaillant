@@ -186,6 +186,8 @@ def send_pushover_alert(report, status):
             "message": report[:1024],
             "priority": priority,
             "sound": "siren" if status == "CRITICAL" else "pushover",
+            "url": "https://konradmakosa.github.io/vaillant/",
+            "url_title": "Wykres diagnostyczny",
         }).encode()
 
         try:
