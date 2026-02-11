@@ -12,6 +12,9 @@ env:
   VAILLANT_BRAND: vaillant
   VAILLANT_COUNTRY: poland
 
+permissions:
+  contents: write
+
 jobs:
   log-data:
     runs-on: ubuntu-latest
