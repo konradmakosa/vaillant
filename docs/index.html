@@ -145,7 +145,6 @@
         }
 
         .live-card.pressure::before { background: var(--accent-pressure); }
-        .live-card.flow::before { background: var(--accent-flow); }
         .live-card.outdoor::before { background: var(--accent-outdoor); }
         .live-card.room::before { background: var(--accent-room); }
         .live-card.dhw::before { background: var(--accent-dhw); }
@@ -165,7 +164,6 @@
         }
 
         .live-value.pressure { color: var(--accent-pressure); }
-        .live-value.flow { color: var(--accent-flow); }
         .live-value.outdoor { color: var(--accent-outdoor); }
         .live-value.room { color: var(--accent-room); }
         .live-value.dhw { color: var(--accent-dhw); }
@@ -299,10 +297,6 @@
             <span class="info-value">Vaillant</span>
         </div>
         <div class="info-item">
-            <span class="info-label">Tryb CWU</span>
-            <span class="info-value" id="info-dhw-mode">—</span>
-        </div>
-        <div class="info-item">
             <span class="info-label">Kontakt</span>
             <span class="info-value">konrad@makosa.org</span>
         </div>
@@ -319,11 +313,6 @@
             <div class="live-label">Ciśnienie wody</div>
             <div class="live-value pressure" id="val-pressure">—</div>
             <div class="live-minmax" id="minmax-pressure"></div>
-        </div>
-        <div class="live-card flow">
-            <div class="live-label">Temp. przepływu</div>
-            <div class="live-value flow" id="val-flow">—</div>
-            <div class="live-minmax" id="minmax-flow"></div>
         </div>
         <div class="live-card dhw">
             <div class="live-label">CWU</div>
@@ -448,8 +437,6 @@ function updateLiveValues(data) {
 
     document.getElementById('val-pressure').innerHTML = pressure !== null
         ? `${pressure.toFixed(1)} <span class="live-unit">bar</span>` : '—';
-    document.getElementById('val-flow').innerHTML = flow !== null
-        ? `${flow.toFixed(1)} <span class="live-unit">°C</span>` : '—';
     document.getElementById('val-outdoor').innerHTML = outdoor !== null
         ? `${outdoor.toFixed(1)} <span class="live-unit">°C</span>` : '—';
     document.getElementById('val-room').innerHTML = room !== null
@@ -458,7 +445,6 @@ function updateLiveValues(data) {
         ? `${dhw.toFixed(1)} <span class="live-unit">°C</span>` : '—';
 
     const pArr = data.map(r => num(r.water_pressure_bar));
-    const fArr = data.map(r => num(r.flow_temp_c));
     const oArr = data.map(r => num(r.outdoor_temp_c));
     const rArr = data.map(r => num(r.zone_current_temp_c));
     const dArr = data.map(r => num(r.dhw_current_temp_c));
@@ -469,7 +455,6 @@ function updateLiveValues(data) {
     };
 
     document.getElementById('minmax-pressure').textContent = mm(pArr, 'bar');
-    document.getElementById('minmax-flow').textContent = mm(fArr, '°C');
     document.getElementById('minmax-outdoor').textContent = mm(oArr, '°C');
     document.getElementById('minmax-room').textContent = mm(rArr, '°C');
     document.getElementById('minmax-dhw').textContent = mm(dArr, '°C');
@@ -477,7 +462,6 @@ function updateLiveValues(data) {
     const ts = last._ts;
     document.getElementById('info-last-reading').textContent =
         ts.toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw' });
-    if (last.dhw_operation_mode) document.getElementById('info-dhw-mode').textContent = last.dhw_operation_mode;
     if (last.connected === 'True') {
         document.getElementById('status-text').textContent = 'Online';
     } else {
@@ -506,19 +490,9 @@ function buildChart(data) {
                     pointRadius: 2,
                     pointHoverRadius: 6,
                     borderWidth: 3,
+                    borderDash: [8, 4],
                     yAxisID: 'yPressure',
                     order: 0,
-                },
-                {
-                    label: 'Temp. przepływu [°C]',
-                    data: data.map(r => num(r.flow_temp_c)),
-                    borderColor: '#ff5722',
-                    tension: 0.3,
-                    pointRadius: 1,
-                    pointHoverRadius: 4,
-                    borderWidth: 2,
-                    yAxisID: 'yTemp',
-                    order: 1,
                 },
                 {
                     label: 'CWU [°C]',
