@@ -28,6 +28,7 @@ COUNTRY = os.environ.get("VAILLANT_COUNTRY", "poland")
 PRESSURE_WARNING = float(os.environ.get("PRESSURE_WARNING", "1.0"))
 PRESSURE_CRITICAL = float(os.environ.get("PRESSURE_CRITICAL", "0.8"))
 
+MIN_INTERVAL_SECONDS = int(os.environ.get("MIN_INTERVAL_SECONDS", "900"))  # 15 min
 CSV_DIR = Path(os.environ.get("CSV_DIR", "data"))
 CSV_HEADERS = [
     "timestamp",
@@ -102,6 +103,29 @@ async def read_boiler_data():
                 "dhw": system.domestic_hot_water,
             }
     return rows, info
+
+
+def too_soon():
+    """Return True if last CSV entry is less than MIN_INTERVAL_SECONDS ago."""
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    csv_path = CSV_DIR / f"boiler_{month}.csv"
+    if not csv_path.exists():
+        return False
+    try:
+        with open(csv_path, "r") as f:
+            lines = f.readlines()
+        if len(lines) < 2:
+            return False
+        last_line = lines[-1].strip()
+        if not last_line:
+            last_line = lines[-2].strip()
+        last_ts = datetime.strptime(last_line.split(",")[0], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        elapsed = (datetime.now(timezone.utc) - last_ts).total_seconds()
+        logger.info(f"Last reading {elapsed:.0f}s ago (min interval: {MIN_INTERVAL_SECONDS}s)")
+        return elapsed < MIN_INTERVAL_SECONDS
+    except Exception as e:
+        logger.warning(f"Could not check last timestamp: {e}")
+        return False
 
 
 def append_to_csv(rows):
@@ -207,6 +231,10 @@ def write_github_summary(status, report):
 
 
 def main():
+    if too_soon():
+        logger.info("Skipping — too soon since last reading.")
+        return
+
     max_retries = 3
     rows, info = [], {}
     for attempt in range(max_retries):

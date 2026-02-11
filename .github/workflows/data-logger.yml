@@ -20,10 +20,6 @@ env:
 permissions:
   contents: write
 
-concurrency:
-  group: vaillant-monitor
-  cancel-in-progress: false
-
 jobs:
   monitor:
     runs-on: ubuntu-latest
