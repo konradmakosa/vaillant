@@ -6,7 +6,6 @@
     <title>Vaillant — Diagnostyka zdalna</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2"></script>
     <style>
         :root {
             --vaillant-green: #00A651;
@@ -20,6 +19,7 @@
             --accent-flow: #ff5722;
             --accent-outdoor: #4fc3f7;
             --accent-room: #ffc107;
+            --accent-dhw: #e91e63;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -120,7 +120,7 @@
 
         .live-values {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -129,7 +129,7 @@
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 20px;
+            padding: 16px;
             text-align: center;
             position: relative;
             overflow: hidden;
@@ -148,17 +148,18 @@
         .live-card.flow::before { background: var(--accent-flow); }
         .live-card.outdoor::before { background: var(--accent-outdoor); }
         .live-card.room::before { background: var(--accent-room); }
+        .live-card.dhw::before { background: var(--accent-dhw); }
 
         .live-label {
-            font-size: 11px;
+            font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: var(--text-muted);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .live-value {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 700;
             font-variant-numeric: tabular-nums;
         }
@@ -167,17 +168,18 @@
         .live-value.flow { color: var(--accent-flow); }
         .live-value.outdoor { color: var(--accent-outdoor); }
         .live-value.room { color: var(--accent-room); }
+        .live-value.dhw { color: var(--accent-dhw); }
 
         .live-unit {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 400;
             color: var(--text-muted);
         }
 
         .live-minmax {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-muted);
-            margin-top: 6px;
+            margin-top: 4px;
         }
 
         .chart-section {
@@ -204,12 +206,7 @@
         .chart-container {
             position: relative;
             width: 100%;
-            overflow-x: auto;
-            overflow-y: hidden;
-        }
-
-        .chart-container canvas {
-            min-width: 100%;
+            height: 420px;
         }
 
         .controls {
@@ -266,15 +263,12 @@
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .warning-zone {
-            position: relative;
-        }
-
         @media (max-width: 768px) {
             .header { padding: 16px; }
             .dashboard { padding: 16px; }
             .brand { font-size: 24px; }
             .live-values { grid-template-columns: repeat(2, 1fr); }
+            .chart-container { height: 320px; }
         }
     </style>
 </head>
@@ -284,7 +278,7 @@
     <div class="header-top">
         <div>
             <div class="brand">VAILLANT</div>
-            <div class="model" id="boiler-model">VR 940f</div>
+            <div class="model">VR 940f</div>
         </div>
         <div class="status-badge status-online" id="status-badge">
             <div class="status-dot"></div>
@@ -294,7 +288,7 @@
     <div class="system-info">
         <div class="info-item">
             <span class="info-label">System</span>
-            <span class="info-value" id="info-system">VR 940f</span>
+            <span class="info-value">VR 940f</span>
         </div>
         <div class="info-item">
             <span class="info-label">Lokalizacja</span>
@@ -331,15 +325,20 @@
             <div class="live-value flow" id="val-flow">—</div>
             <div class="live-minmax" id="minmax-flow"></div>
         </div>
-        <div class="live-card outdoor">
-            <div class="live-label">Temp. zewnętrzna</div>
-            <div class="live-value outdoor" id="val-outdoor">—</div>
-            <div class="live-minmax" id="minmax-outdoor"></div>
+        <div class="live-card dhw">
+            <div class="live-label">CWU</div>
+            <div class="live-value dhw" id="val-dhw">—</div>
+            <div class="live-minmax" id="minmax-dhw"></div>
         </div>
         <div class="live-card room">
             <div class="live-label">Temp. pomieszczenia</div>
             <div class="live-value room" id="val-room">—</div>
             <div class="live-minmax" id="minmax-room"></div>
+        </div>
+        <div class="live-card outdoor">
+            <div class="live-label">Temp. zewnętrzna</div>
+            <div class="live-value outdoor" id="val-outdoor">—</div>
+            <div class="live-minmax" id="minmax-outdoor"></div>
         </div>
     </div>
 
@@ -354,18 +353,10 @@
     </div>
 
     <div class="chart-section">
-        <div class="chart-title">Ciśnienie wody w układzie</div>
-        <div class="chart-subtitle">Zakres normy: 1.0 – 2.5 bar</div>
+        <div class="chart-title">Ciśnienie i temperatury — korelacja</div>
+        <div class="chart-subtitle">Lewa oś: ciśnienie [bar] · Prawa oś: temperatury [°C] · Strefa ostrzegawcza ciśnienia < 1.0 bar</div>
         <div class="chart-container">
-            <canvas id="chart-pressure" height="220"></canvas>
-        </div>
-    </div>
-
-    <div class="chart-section">
-        <div class="chart-title">Temperatury</div>
-        <div class="chart-subtitle">Przepływ · Zewnętrzna · Pomieszczenie · CWU</div>
-        <div class="chart-container">
-            <canvas id="chart-temps" height="280"></canvas>
+            <canvas id="chart-combined"></canvas>
         </div>
     </div>
 </div>
@@ -382,8 +373,7 @@
 <script>
 const CSV_BASE_URL = 'https://raw.githubusercontent.com/konradmakosa/vaillant/main/data/';
 let allData = [];
-let pressureChart = null;
-let tempsChart = null;
+let combinedChart = null;
 let selectedRange = 24;
 
 async function fetchCSV(filename) {
@@ -440,6 +430,12 @@ function num(v) {
     return isNaN(n) ? null : n;
 }
 
+function minMax(arr) {
+    const valid = arr.filter(v => v !== null);
+    if (!valid.length) return { min: null, max: null };
+    return { min: Math.min(...valid), max: Math.max(...valid) };
+}
+
 function updateLiveValues(data) {
     if (data.length === 0) return;
     const last = data[data.length - 1];
@@ -458,23 +454,26 @@ function updateLiveValues(data) {
         ? `${outdoor.toFixed(1)} <span class="live-unit">°C</span>` : '—';
     document.getElementById('val-room').innerHTML = room !== null
         ? `${room.toFixed(1)} <span class="live-unit">°C</span>` : '—';
+    document.getElementById('val-dhw').innerHTML = dhw !== null
+        ? `${dhw.toFixed(1)} <span class="live-unit">°C</span>` : '—';
 
-    // Min/Max
-    const pressures = data.map(r => num(r.water_pressure_bar)).filter(v => v !== null);
-    const flows = data.map(r => num(r.flow_temp_c)).filter(v => v !== null);
-    const outdoors = data.map(r => num(r.outdoor_temp_c)).filter(v => v !== null);
-    const rooms = data.map(r => num(r.zone_current_temp_c)).filter(v => v !== null);
+    const pArr = data.map(r => num(r.water_pressure_bar));
+    const fArr = data.map(r => num(r.flow_temp_c));
+    const oArr = data.map(r => num(r.outdoor_temp_c));
+    const rArr = data.map(r => num(r.zone_current_temp_c));
+    const dArr = data.map(r => num(r.dhw_current_temp_c));
 
-    if (pressures.length) document.getElementById('minmax-pressure').textContent =
-        `min ${Math.min(...pressures).toFixed(1)} · max ${Math.max(...pressures).toFixed(1)} bar`;
-    if (flows.length) document.getElementById('minmax-flow').textContent =
-        `min ${Math.min(...flows).toFixed(1)} · max ${Math.max(...flows).toFixed(1)} °C`;
-    if (outdoors.length) document.getElementById('minmax-outdoor').textContent =
-        `min ${Math.min(...outdoors).toFixed(1)} · max ${Math.max(...outdoors).toFixed(1)} °C`;
-    if (rooms.length) document.getElementById('minmax-room').textContent =
-        `min ${Math.min(...rooms).toFixed(1)} · max ${Math.max(...rooms).toFixed(1)} °C`;
+    const mm = (arr, unit) => {
+        const m = minMax(arr);
+        return m.min !== null ? `min ${m.min.toFixed(1)} · max ${m.max.toFixed(1)} ${unit}` : '';
+    };
 
-    // System info
+    document.getElementById('minmax-pressure').textContent = mm(pArr, 'bar');
+    document.getElementById('minmax-flow').textContent = mm(fArr, '°C');
+    document.getElementById('minmax-outdoor').textContent = mm(oArr, '°C');
+    document.getElementById('minmax-room').textContent = mm(rArr, '°C');
+    document.getElementById('minmax-dhw').textContent = mm(dArr, '°C');
+
     const ts = last._ts;
     document.getElementById('info-last-reading').textContent =
         ts.toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw' });
@@ -487,145 +486,73 @@ function updateLiveValues(data) {
     }
 }
 
-function buildCharts(data) {
+function buildChart(data) {
     const labels = data.map(r => r._ts);
+    const ctx = document.getElementById('chart-combined').getContext('2d');
+    if (combinedChart) combinedChart.destroy();
 
-    // Pressure chart
-    const ctxP = document.getElementById('chart-pressure').getContext('2d');
-    if (pressureChart) pressureChart.destroy();
-
-    pressureChart = new Chart(ctxP, {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Ciśnienie [bar]',
-                data: data.map(r => num(r.water_pressure_bar)),
-                borderColor: 'rgba(0, 188, 212, 1)',
-                backgroundColor: 'rgba(0, 188, 212, 0.1)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 2,
-                pointHoverRadius: 5,
-                borderWidth: 2,
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { intersect: false, mode: 'index' },
-            plugins: {
-                legend: { display: false },
-                zoom: {
-                    pan: { enabled: true, mode: 'x' },
-                    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
-                },
-                annotation: {}
-            },
-            scales: {
-                x: {
-                    type: 'time',
-                    time: {
-                        tooltipFormat: 'dd.MM.yyyy HH:mm',
-                        displayFormats: {
-                            minute: 'HH:mm',
-                            hour: 'dd.MM HH:mm',
-                            day: 'dd.MM'
-                        }
-                    },
-                    grid: { color: 'rgba(255,255,255,0.05)' },
-                    ticks: { color: '#8888aa', maxRotation: 0, font: { size: 11 } }
-                },
-                y: {
-                    min: 0,
-                    max: 3.5,
-                    grid: { color: 'rgba(255,255,255,0.05)' },
-                    ticks: {
-                        color: '#8888aa',
-                        callback: v => v.toFixed(1) + ' bar',
-                        font: { size: 11 }
-                    }
-                }
-            }
-        },
-        plugins: [{
-            id: 'pressureZones',
-            beforeDraw(chart) {
-                const { ctx, chartArea: { left, right, top, bottom }, scales: { y } } = chart;
-                // Warning zone < 1.0 bar
-                const y1 = y.getPixelForValue(1.0);
-                const y0 = y.getPixelForValue(0);
-                ctx.save();
-                ctx.fillStyle = 'rgba(255, 87, 34, 0.08)';
-                ctx.fillRect(left, y1, right - left, y0 - y1);
-                // Normal zone line
-                ctx.strokeStyle = 'rgba(0, 166, 81, 0.4)';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([5, 5]);
-                const yNorm = y.getPixelForValue(1.5);
-                ctx.beginPath();
-                ctx.moveTo(left, yNorm);
-                ctx.lineTo(right, yNorm);
-                ctx.stroke();
-                // Warning line
-                ctx.strokeStyle = 'rgba(255, 87, 34, 0.5)';
-                ctx.beginPath();
-                ctx.moveTo(left, y1);
-                ctx.lineTo(right, y1);
-                ctx.stroke();
-                ctx.restore();
-            }
-        }]
-    });
-
-    // Temps chart
-    const ctxT = document.getElementById('chart-temps').getContext('2d');
-    if (tempsChart) tempsChart.destroy();
-
-    tempsChart = new Chart(ctxT, {
+    combinedChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels,
             datasets: [
                 {
+                    label: 'Ciśnienie [bar]',
+                    data: data.map(r => num(r.water_pressure_bar)),
+                    borderColor: '#00bcd4',
+                    backgroundColor: 'rgba(0, 188, 212, 0.08)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2,
+                    pointHoverRadius: 6,
+                    borderWidth: 3,
+                    yAxisID: 'yPressure',
+                    order: 0,
+                },
+                {
                     label: 'Temp. przepływu [°C]',
                     data: data.map(r => num(r.flow_temp_c)),
                     borderColor: '#ff5722',
-                    backgroundColor: 'rgba(255, 87, 34, 0.05)',
                     tension: 0.3,
                     pointRadius: 1,
                     pointHoverRadius: 4,
                     borderWidth: 2,
+                    yAxisID: 'yTemp',
+                    order: 1,
                 },
                 {
                     label: 'CWU [°C]',
                     data: data.map(r => num(r.dhw_current_temp_c)),
                     borderColor: '#e91e63',
-                    backgroundColor: 'rgba(233, 30, 99, 0.05)',
                     tension: 0.3,
                     pointRadius: 1,
                     pointHoverRadius: 4,
                     borderWidth: 2,
+                    yAxisID: 'yTemp',
+                    order: 2,
                 },
                 {
                     label: 'Temp. pomieszczenia [°C]',
                     data: data.map(r => num(r.zone_current_temp_c)),
                     borderColor: '#ffc107',
-                    backgroundColor: 'rgba(255, 193, 7, 0.05)',
                     tension: 0.3,
                     pointRadius: 1,
                     pointHoverRadius: 4,
                     borderWidth: 2,
+                    yAxisID: 'yTemp',
+                    order: 3,
                 },
                 {
                     label: 'Temp. zewnętrzna [°C]',
                     data: data.map(r => num(r.outdoor_temp_c)),
                     borderColor: '#4fc3f7',
-                    backgroundColor: 'rgba(79, 195, 247, 0.05)',
                     tension: 0.3,
                     pointRadius: 1,
                     pointHoverRadius: 4,
                     borderWidth: 2,
+                    borderDash: [4, 4],
+                    yAxisID: 'yTemp',
+                    order: 4,
                 },
             ]
         },
@@ -635,11 +562,29 @@ function buildCharts(data) {
             interaction: { intersect: false, mode: 'index' },
             plugins: {
                 legend: {
-                    labels: { color: '#8888aa', usePointStyle: true, pointStyle: 'line', font: { size: 11 } }
+                    labels: {
+                        color: '#8888aa',
+                        usePointStyle: true,
+                        pointStyle: 'line',
+                        font: { size: 11 },
+                        padding: 16,
+                    }
                 },
-                zoom: {
-                    pan: { enabled: true, mode: 'x' },
-                    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+                tooltip: {
+                    backgroundColor: 'rgba(26, 26, 46, 0.95)',
+                    borderColor: '#2a2a4a',
+                    borderWidth: 1,
+                    titleFont: { size: 12 },
+                    bodyFont: { size: 12 },
+                    padding: 12,
+                    callbacks: {
+                        label: function(ctx) {
+                            const v = ctx.parsed.y;
+                            if (v === null) return null;
+                            const unit = ctx.dataset.yAxisID === 'yPressure' ? ' bar' : '°C';
+                            return ` ${ctx.dataset.label.split(' [')[0]}: ${v.toFixed(2)}${unit}`;
+                        }
+                    }
                 }
             },
             scales: {
@@ -656,23 +601,80 @@ function buildCharts(data) {
                     grid: { color: 'rgba(255,255,255,0.05)' },
                     ticks: { color: '#8888aa', maxRotation: 0, font: { size: 11 } }
                 },
-                y: {
-                    grid: { color: 'rgba(255,255,255,0.05)' },
+                yPressure: {
+                    type: 'linear',
+                    position: 'left',
+                    min: 0,
+                    max: 3.5,
+                    title: {
+                        display: true,
+                        text: 'Ciśnienie [bar]',
+                        color: '#00bcd4',
+                        font: { size: 12, weight: '600' }
+                    },
+                    grid: { color: 'rgba(0, 188, 212, 0.08)' },
                     ticks: {
-                        color: '#8888aa',
-                        callback: v => v + '°C',
+                        color: '#00bcd4',
+                        callback: v => v.toFixed(1),
+                        font: { size: 11 }
+                    }
+                },
+                yTemp: {
+                    type: 'linear',
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Temperatura [°C]',
+                        color: '#ff5722',
+                        font: { size: 12, weight: '600' }
+                    },
+                    grid: { drawOnChartArea: false },
+                    ticks: {
+                        color: '#ff5722',
+                        callback: v => v + '°',
                         font: { size: 11 }
                     }
                 }
             }
-        }
+        },
+        plugins: [{
+            id: 'pressureWarningZone',
+            beforeDraw(chart) {
+                const { ctx, chartArea: { left, right }, scales: { yPressure } } = chart;
+                if (!yPressure) return;
+                const y1bar = yPressure.getPixelForValue(1.0);
+                const y0bar = yPressure.getPixelForValue(0);
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 87, 34, 0.06)';
+                ctx.fillRect(left, y1bar, right - left, y0bar - y1bar);
+                ctx.strokeStyle = 'rgba(255, 87, 34, 0.4)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.moveTo(left, y1bar);
+                ctx.lineTo(right, y1bar);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(255, 87, 34, 0.6)';
+                ctx.font = '10px system-ui';
+                ctx.fillText('min 1.0 bar', left + 6, y1bar - 4);
+                ctx.strokeStyle = 'rgba(0, 166, 81, 0.3)';
+                const y15 = yPressure.getPixelForValue(1.5);
+                ctx.beginPath();
+                ctx.moveTo(left, y15);
+                ctx.lineTo(right, y15);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(0, 166, 81, 0.5)';
+                ctx.fillText('norma 1.5 bar', left + 6, y15 - 4);
+                ctx.restore();
+            }
+        }]
     });
 }
 
 function refresh() {
     const filtered = filterByRange(allData, selectedRange);
     updateLiveValues(filtered);
-    buildCharts(filtered);
+    buildChart(filtered);
 }
 
 document.querySelectorAll('.btn[data-range]').forEach(btn => {
