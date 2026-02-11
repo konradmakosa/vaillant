@@ -10,7 +10,7 @@
 
 const REPO = 'konradmakosa/vaillant';
 const EVENT_TYPE = 'log-data';
-const COOLDOWN_SECONDS = 120; // ignore repeated calls within 2 min
+const COOLDOWN_SECONDS = 600; // ignore repeated calls within 10 min (Vaillant API quota)
 
 let lastTrigger = 0;
 

@@ -9,6 +9,7 @@ import csv
 import os
 import sys
 import logging
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -107,7 +108,22 @@ def append_to_csv(rows):
 
 
 def main():
-    rows = asyncio.run(read_boiler_data())
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            rows = asyncio.run(read_boiler_data())
+            break
+        except Exception as e:
+            if '403' in str(e) and 'Quota' in str(e) and attempt < max_retries - 1:
+                wait = 120 * (attempt + 1)
+                logger.warning(f"API quota exceeded, retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait)
+            else:
+                logger.error(f"Failed to read boiler data: {e}")
+                sys.exit(1)
+    else:
+        rows = []
+
     if not rows:
         logger.error("No data retrieved from boiler.")
         sys.exit(1)

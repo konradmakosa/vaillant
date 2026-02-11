@@ -16,6 +16,10 @@ env:
 permissions:
   contents: write
 
+concurrency:
+  group: data-logger
+  cancel-in-progress: true
+
 jobs:
   log-data:
     runs-on: ubuntu-latest
