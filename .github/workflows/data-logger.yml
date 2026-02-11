@@ -1,8 +1,8 @@
-name: Vaillant Data Logger
+name: Vaillant Monitor
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/16 * * * *'
   repository_dispatch:
     types: [log-data]
   workflow_dispatch:
@@ -12,16 +12,20 @@ env:
   VAILLANT_PASSWORD: ${{ secrets.VAILLANT_PASSWORD }}
   VAILLANT_BRAND: vaillant
   VAILLANT_COUNTRY: poland
+  PRESSURE_WARNING: "1.0"
+  PRESSURE_CRITICAL: "0.8"
+  PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+  PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
 
 permissions:
   contents: write
 
 concurrency:
-  group: data-logger
+  group: vaillant-monitor
   cancel-in-progress: true
 
 jobs:
-  log-data:
+  monitor:
     runs-on: ubuntu-latest
 
     steps:
@@ -36,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Log boiler data
+      - name: Log data + check pressure
         run: python log_boiler_data.py
 
       - name: Commit CSV data
