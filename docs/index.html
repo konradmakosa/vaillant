@@ -710,7 +710,14 @@ document.querySelectorAll('.btn[data-range]').forEach(btn => {
     });
 });
 
+const TRIGGER_URL = 'https://vaillant-trigger.konradmakosa.workers.dev';
+
+function triggerDataLog() {
+    fetch(TRIGGER_URL, { method: 'POST' }).catch(() => {});
+}
+
 (async function init() {
+    triggerDataLog();
     await loadAllData();
     document.getElementById('loading').style.display = 'none';
     if (allData.length === 0) {

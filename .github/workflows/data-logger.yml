@@ -2,8 +2,9 @@ name: Vaillant Data Logger
 
 on:
   schedule:
-    # Run every 10 minutes
-    - cron: '*/10 * * * *'
+    - cron: '*/15 * * * *'
+  repository_dispatch:
+    types: [log-data]
   workflow_dispatch:
 
 env:
