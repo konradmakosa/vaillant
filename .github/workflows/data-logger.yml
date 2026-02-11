@@ -1,0 +1,40 @@
+name: Vaillant Data Logger
+
+on:
+  schedule:
+    # Run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+env:
+  VAILLANT_USERNAME: ${{ secrets.VAILLANT_USERNAME }}
+  VAILLANT_PASSWORD: ${{ secrets.VAILLANT_PASSWORD }}
+  VAILLANT_BRAND: vaillant
+  VAILLANT_COUNTRY: poland
+
+jobs:
+  log-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Log boiler data
+        run: python log_boiler_data.py
+
+      - name: Commit CSV data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "data: $(date -u '+%Y-%m-%d %H:%M') UTC"
+          git push
