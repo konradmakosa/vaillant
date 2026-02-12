@@ -574,7 +574,7 @@ function buildChart(data) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: { intersect: false, mode: 'index' },
+            interaction: { intersect: false, mode: 'nearest' },
             plugins: {
                 legend: {
                     labels: {
@@ -591,9 +591,10 @@ function buildChart(data) {
                     backgroundColor: 'rgba(26, 26, 46, 0.95)',
                     borderColor: '#2a2a4a',
                     borderWidth: 1,
-                    titleFont: { size: 12 },
-                    bodyFont: { size: 12 },
-                    padding: 12,
+                    titleFont: { size: isMobile ? 10 : 12 },
+                    bodyFont: { size: isMobile ? 10 : 12 },
+                    padding: isMobile ? 6 : 12,
+                    displayColors: false,
                     callbacks: {
                         label: function(ctx) {
                             const v = ctx.parsed.y;
@@ -636,8 +637,9 @@ function buildChart(data) {
                     ticks: {
                         color: '#00bcd4',
                         callback: v => isMobile ? v.toFixed(0) : v.toFixed(1),
-                        font: { size: isMobile ? 9 : 11 },
-                        maxTicksLimit: isMobile ? 5 : 8,
+                        font: { size: isMobile ? 8 : 11 },
+                        maxTicksLimit: isMobile ? 4 : 8,
+                        padding: isMobile ? 2 : 4,
                     }
                 },
                 yHeating: {
@@ -659,8 +661,9 @@ function buildChart(data) {
                     ticks: {
                         color: '#ff5722',
                         callback: v => v + '°',
-                        font: { size: isMobile ? 9 : 11 },
-                        maxTicksLimit: isMobile ? 5 : 8,
+                        font: { size: isMobile ? 8 : 11 },
+                        maxTicksLimit: isMobile ? 4 : 8,
+                        padding: isMobile ? 2 : 4,
                     }
                 }
             }
