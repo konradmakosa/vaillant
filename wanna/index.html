@@ -408,15 +408,14 @@ function tryShowEgg() {
     if (knownEggs.length === 0) return;
     const overlay = document.getElementById('egg-overlay');
     if (!overlay) return;
-    const roll = Math.random();
-    const threshold = 1 / (knownEggs.length + 1);
-    if (roll > threshold) {
-        console.log(`🥚 roll ${roll.toFixed(2)} > ${threshold.toFixed(2)} — skip`);
+    // pool: n eggs + 1 skip → e.g. 4 eggs = 80% play, 20% skip
+    const pick = Math.floor(Math.random() * (knownEggs.length + 1));
+    if (pick >= knownEggs.length) {
+        console.log(`🥚 pick ${pick}/${knownEggs.length} — skip`);
         return;
     }
-    const idx = Math.floor(Math.random() * knownEggs.length);
-    const src = knownEggs[idx];
-    console.log(`🥚 roll ${roll.toFixed(2)} ≤ ${threshold.toFixed(2)} — showing ${src}`);
+    const src = knownEggs[pick];
+    console.log(`🥚 pick ${pick}/${knownEggs.length} — showing ${src}`);
     overlay.src = src;
     overlay.classList.add('visible');
     const p = overlay.play();
