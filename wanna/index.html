@@ -41,7 +41,6 @@
             z-index: 0;
             pointer-events: none;
             opacity: 0;
-            transition: opacity 1s ease-in-out;
         }
 
         .egg-overlay.visible {
@@ -403,23 +402,23 @@ async function discoverEggs() {
         } catch (_) {}
     }
     console.log(`Easter eggs found: ${knownEggs.length}`);
-    if (knownEggs.length > 0) showRandomEgg();
 }
 
-function showRandomEgg() {
+function tryShowEgg() {
+    if (knownEggs.length === 0) return;
     const overlay = document.getElementById('egg-overlay');
+    // probability: 1 egg = 50%, 2 eggs = 33%, 3 eggs = 25% ...
+    if (Math.random() > 1 / (knownEggs.length + 1)) {
+        overlay.classList.remove('visible');
+        overlay.removeAttribute('src');
+        return;
+    }
     const src = knownEggs[Math.floor(Math.random() * knownEggs.length)];
     overlay.src = src;
     overlay.classList.add('visible');
-    // Keep visible for the interval, then fade out briefly before next
-    setTimeout(() => {
-        overlay.classList.remove('visible');
-    }, EGG_INTERVAL - 2000);
 }
 
-setInterval(() => {
-    if (knownEggs.length > 0) showRandomEgg();
-}, EGG_INTERVAL);
+setInterval(tryShowEgg, EGG_INTERVAL);
 
 // ── Init ──
 loadData();
