@@ -179,8 +179,9 @@
         }
 
         .boost-btn.active {
-            border-color: rgba(255, 107, 157, 0.8);
-            background: rgba(255, 107, 157, 0.3);
+            border-color: rgba(255, 213, 79, 0.8);
+            background: rgba(255, 213, 79, 0.35);
+            color: #ffd54f;
             animation: pulse 2s ease-in-out infinite;
         }
 
@@ -190,8 +191,8 @@
         }
 
         @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 157, 0.4); }
-            50%      { box-shadow: 0 0 0 14px rgba(255, 107, 157, 0); }
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 213, 79, 0.4); }
+            50%      { box-shadow: 0 0 0 14px rgba(255, 213, 79, 0); }
         }
 
         .boost-status {
@@ -200,7 +201,7 @@
             bottom: 110px;
             right: 12px;
             font-size: 10px;
-            color: rgba(255, 107, 157, 0.8);
+            color: rgba(255, 213, 79, 0.9);
             text-align: center;
             width: 88px;
         }
@@ -310,11 +311,47 @@ async function loadData() {
 }
 
 // ── Boost ──
-let boostActive = false;
+const BOOST_LOCK_MS = 30 * 60 * 1000; // 30 minutes
+let boostTimer = null;
+
+function getBoostExpiry() {
+    const v = localStorage.getItem('boost_expiry');
+    return v ? parseInt(v) : 0;
+}
+
+function setBoostExpiry(ts) {
+    localStorage.setItem('boost_expiry', String(ts));
+}
+
+function updateBoostUI() {
+    const btn = document.getElementById('boost-btn');
+    const status = document.getElementById('boost-status');
+    const remaining = getBoostExpiry() - Date.now();
+
+    if (remaining > 0) {
+        btn.classList.add('active');
+        btn.classList.add('loading');
+        const min = Math.ceil(remaining / 60000);
+        status.textContent = `Grzeje ${min} min`;
+        if (!boostTimer) {
+            boostTimer = setInterval(updateBoostUI, 10000);
+        }
+    } else {
+        btn.classList.remove('active');
+        btn.classList.remove('loading');
+        status.textContent = '';
+        if (boostTimer) {
+            clearInterval(boostTimer);
+            boostTimer = null;
+        }
+    }
+}
 
 async function toggleBoost() {
     const btn = document.getElementById('boost-btn');
     const status = document.getElementById('boost-status');
+
+    if (getBoostExpiry() > Date.now()) return; // locked
 
     btn.classList.add('loading');
     status.textContent = 'Wysyłam...';
@@ -327,20 +364,27 @@ async function toggleBoost() {
         });
         const data = await resp.json();
 
-        if (data.status === 'triggered' || data.status === 'cooldown') {
-            boostActive = !boostActive;
-            btn.classList.toggle('active', boostActive);
-            status.textContent = boostActive ? 'Grzanie uruchomione' : '';
+        if (data.status === 'triggered') {
+            setBoostExpiry(Date.now() + BOOST_LOCK_MS);
+            updateBoostUI();
+        } else if (data.status === 'cooldown') {
+            status.textContent = `Poczekaj ${data.retry_in}s`;
+            btn.classList.remove('loading');
+            setTimeout(() => { status.textContent = ''; }, 5000);
         } else {
-            status.textContent = 'Błąd: ' + (data.error || 'nieznany');
+            status.textContent = 'Błąd';
+            btn.classList.remove('loading');
+            setTimeout(() => { status.textContent = ''; }, 5000);
         }
     } catch (e) {
         status.textContent = 'Brak połączenia';
+        btn.classList.remove('loading');
+        setTimeout(() => { status.textContent = ''; }, 5000);
     }
-
-    btn.classList.remove('loading');
-    setTimeout(() => { status.textContent = ''; }, 5000);
 }
+
+// Restore boost state on load
+updateBoostUI();
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {

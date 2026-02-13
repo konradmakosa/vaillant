@@ -17,6 +17,7 @@ permissions:
 jobs:
   boost:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
 
     steps:
       - name: Checkout repository
@@ -30,5 +31,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Boost domestic hot water
+      - name: Boost domestic hot water (30 min cycle)
+        env:
+          BOOST_DURATION_MIN: '30'
         run: python boost_dhw.py
