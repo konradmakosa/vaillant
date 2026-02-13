@@ -1,6 +1,7 @@
 /**
  * Cloudflare Worker — proxy for GitHub repository_dispatch.
  * Hides the GitHub token from the public page.
+ * Supports multiple event types with separate cooldowns.
  *
  * Environment variables (set in CF dashboard → Worker → Settings → Variables):
  *   GITHUB_TOKEN  — fine-grained PAT with contents:write on the repo
@@ -9,11 +10,12 @@
  */
 
 const REPO = 'konradmakosa/vaillant';
-const EVENT_TYPE = 'log-data';
-const COOLDOWN_SECONDS = 600; // 10 min cooldown (Vaillant API quota)
-const CACHE_KEY = 'https://vaillant-trigger.internal/last-trigger';
-
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
+
+const ACTIONS = {
+  'log-data':  { cooldown: 600 },  // 10 min — automatic data logging
+  'boost-dhw': { cooldown: 60 },   // 1 min — user-initiated hot water boost
+};
 
 export default {
   async fetch(request, env) {
@@ -31,14 +33,26 @@ export default {
       return new Response(JSON.stringify({ error: 'POST only' }), { status: 405, headers: CORS });
     }
 
-    // Persistent cooldown via Cache API
+    // Determine action from request body
+    let action = 'log-data';
+    try {
+      const body = await request.json();
+      if (body.action && ACTIONS[body.action]) {
+        action = body.action;
+      }
+    } catch (_) {}
+
+    const config = ACTIONS[action];
+    const cacheKey = `https://vaillant-trigger.internal/cooldown/${action}`;
+
+    // Persistent cooldown via Cache API (per action)
     const cache = caches.default;
-    const cached = await cache.match(CACHE_KEY);
+    const cached = await cache.match(cacheKey);
     if (cached) {
       const age = (Date.now() / 1000) - parseFloat(await cached.text());
-      if (age < COOLDOWN_SECONDS) {
-        const wait = Math.ceil(COOLDOWN_SECONDS - age);
-        return new Response(JSON.stringify({ status: 'cooldown', retry_in: wait }), { status: 429, headers: CORS });
+      if (age < config.cooldown) {
+        const wait = Math.ceil(config.cooldown - age);
+        return new Response(JSON.stringify({ status: 'cooldown', action, retry_in: wait }), { status: 429, headers: CORS });
       }
     }
 
@@ -55,16 +69,15 @@ export default {
         'User-Agent': 'vaillant-cf-worker',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ event_type: EVENT_TYPE }),
+      body: JSON.stringify({ event_type: action }),
     });
 
     if (resp.status === 204) {
-      // Store timestamp in cache for COOLDOWN_SECONDS
       const ts = new Response(String(Date.now() / 1000), {
-        headers: { 'Cache-Control': `max-age=${COOLDOWN_SECONDS}` },
+        headers: { 'Cache-Control': `max-age=${config.cooldown}` },
       });
-      await cache.put(CACHE_KEY, ts);
-      return new Response(JSON.stringify({ status: 'triggered' }), { headers: CORS });
+      await cache.put(cacheKey, ts);
+      return new Response(JSON.stringify({ status: 'triggered', action }), { headers: CORS });
     }
 
     const body = await resp.text();

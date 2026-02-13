@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Wanna">
+    <meta name="theme-color" content="#0a1628">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Wanna</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            width: 100%; height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+            background: #0a1628;
+            color: #fff;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* ── Layer 1: Video background ── */
+        .bg-video {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            opacity: 0.55;
+        }
+
+        /* ── Layer 2: Steam / mist overlay ── */
+        .steam-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1;
+            pointer-events: none;
+            background:
+                radial-gradient(ellipse at 30% 80%, rgba(100, 180, 255, 0.08) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 20%, rgba(255, 255, 255, 0.04) 0%, transparent 50%);
+            animation: steamDrift 12s ease-in-out infinite alternate;
+        }
+
+        @keyframes steamDrift {
+            0%   { opacity: 0.6; transform: translateY(0) scale(1); }
+            100% { opacity: 1;   transform: translateY(-8px) scale(1.02); }
+        }
+
+        /* Floating steam particles */
+        .particle {
+            position: fixed;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%);
+            z-index: 1;
+            pointer-events: none;
+            animation: float linear infinite;
+        }
+
+        @keyframes float {
+            0%   { transform: translateY(0) scale(1); opacity: 0; }
+            10%  { opacity: 1; }
+            90%  { opacity: 1; }
+            100% { transform: translateY(-100vh) scale(0.3); opacity: 0; }
+        }
+
+        /* ── Layer 3: Content ── */
+        .content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 60px 24px 40px;
+            gap: 20px;
+        }
+
+        .app-title {
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 4px;
+        }
+
+        /* Temperature cards */
+        .temp-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            max-width: 340px;
+        }
+
+        .temp-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .temp-card:active {
+            transform: scale(0.97);
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .temp-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.65);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .temp-label .icon {
+            font-size: 20px;
+        }
+
+        .temp-value {
+            font-size: 28px;
+            font-weight: 300;
+            letter-spacing: -1px;
+        }
+
+        .temp-value .unit {
+            font-size: 16px;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Color accents */
+        .temp-card.dhw .temp-value { color: #ff6b9d; }
+        .temp-card.flow .temp-value { color: #ff8a50; }
+        .temp-card.room .temp-value { color: #ffd54f; }
+        .temp-card.outdoor .temp-value { color: #64b5f6; }
+        .temp-card.pressure .temp-value { color: #4dd0e1; }
+
+        /* ── Layer 4: Boost button ── */
+        .boost-section {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .boost-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 107, 157, 0.4);
+            background: rgba(255, 107, 157, 0.12);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #ff6b9d;
+            font-size: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .boost-btn:active {
+            transform: scale(0.9);
+            background: rgba(255, 107, 157, 0.3);
+        }
+
+        .boost-btn.active {
+            border-color: rgba(255, 107, 157, 0.8);
+            background: rgba(255, 107, 157, 0.25);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .boost-btn.loading {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 157, 0.3); }
+            50%      { box-shadow: 0 0 0 16px rgba(255, 107, 157, 0); }
+        }
+
+        .boost-label {
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .boost-status {
+            font-size: 11px;
+            color: rgba(255, 107, 157, 0.7);
+            height: 16px;
+        }
+
+        /* Timestamp */
+        .timestamp {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.25);
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        /* Loading state */
+        .loading-text {
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 13px;
+        }
+
+        /* Safe area padding for notch */
+        @supports (padding-top: env(safe-area-inset-top)) {
+            .content {
+                padding-top: calc(60px + env(safe-area-inset-top));
+                padding-bottom: calc(40px + env(safe-area-inset-bottom));
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Layer 1: Video background -->
+<video class="bg-video" autoplay muted loop playsinline>
+    <source src="wanna_background.mp4" type="video/mp4">
+</video>
+
+<!-- Layer 2: Steam overlay -->
+<div class="steam-overlay"></div>
+
+<!-- Layer 3: Content -->
+<div class="content">
+    <div class="app-title">Wanna</div>
+
+    <div class="temp-grid">
+        <div class="temp-card dhw">
+            <div class="temp-label"><span class="icon">🚿</span> Ciepła woda</div>
+            <div class="temp-value" id="v-dhw"><span class="loading-text">—</span></div>
+        </div>
+        <div class="temp-card flow">
+            <div class="temp-label"><span class="icon">🔥</span> Przepływ</div>
+            <div class="temp-value" id="v-flow"><span class="loading-text">—</span></div>
+        </div>
+        <div class="temp-card room">
+            <div class="temp-label"><span class="icon">🏠</span> Pomieszczenie</div>
+            <div class="temp-value" id="v-room"><span class="loading-text">—</span></div>
+        </div>
+        <div class="temp-card outdoor">
+            <div class="temp-label"><span class="icon">🌡️</span> Na zewnątrz</div>
+            <div class="temp-value" id="v-outdoor"><span class="loading-text">—</span></div>
+        </div>
+        <div class="temp-card pressure">
+            <div class="temp-label"><span class="icon">💧</span> Ciśnienie</div>
+            <div class="temp-value" id="v-pressure"><span class="loading-text">—</span></div>
+        </div>
+    </div>
+
+    <!-- Layer 4: Boost button -->
+    <div class="boost-section">
+        <button class="boost-btn" id="boost-btn" onclick="toggleBoost()">♨️</button>
+        <div class="boost-label">Grzej wodę</div>
+        <div class="boost-status" id="boost-status"></div>
+    </div>
+
+    <div class="timestamp" id="timestamp"></div>
+</div>
+
+<script>
+// ── Config ──
+const REPO_OWNER = 'konradmakosa';
+const REPO_NAME = 'vaillant';
+const WORKER_URL = 'https://vaillant-trigger.konrad-makosa.workers.dev';
+
+// ── Steam particles ──
+function createParticles() {
+    for (let i = 0; i < 15; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        const size = 20 + Math.random() * 60;
+        p.style.width = size + 'px';
+        p.style.height = size + 'px';
+        p.style.left = (Math.random() * 100) + '%';
+        p.style.bottom = '-' + size + 'px';
+        p.style.animationDuration = (8 + Math.random() * 12) + 's';
+        p.style.animationDelay = (Math.random() * 10) + 's';
+        document.body.appendChild(p);
+    }
+}
+createParticles();
+
+// ── Data loading ──
+function getCSVUrl() {
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+    return `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/boiler_${y}-${m}.csv`;
+}
+
+function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return null;
+    const headers = lines[0].split(',');
+    const last = lines[lines.length - 1].split(',');
+    const row = {};
+    headers.forEach((h, i) => { row[h.trim()] = (last[i] || '').trim(); });
+    return row;
+}
+
+function setVal(id, val, unit) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (val === undefined || val === null || val === '' || val === 'None') {
+        el.innerHTML = '<span class="loading-text">—</span>';
+    } else {
+        const n = parseFloat(val);
+        if (isNaN(n)) {
+            el.innerHTML = '<span class="loading-text">—</span>';
+        } else {
+            el.innerHTML = n.toFixed(1) + '<span class="unit"> ' + unit + '</span>';
+        }
+    }
+}
+
+async function loadData() {
+    try {
+        const resp = await fetch(getCSVUrl(), { cache: 'no-store' });
+        if (!resp.ok) return;
+        const text = await resp.text();
+        const row = parseCSV(text);
+        if (!row) return;
+
+        setVal('v-dhw', row.dhw_current_temp_c, '°C');
+        setVal('v-flow', row.circuit_flow_temp_c, '°C');
+        setVal('v-room', row.zone_current_temp_c, '°C');
+        setVal('v-outdoor', row.outdoor_temp_c, '°C');
+        setVal('v-pressure', row.water_pressure_bar, 'bar');
+
+        if (row.timestamp) {
+            const ts = new Date(row.timestamp + 'Z');
+            document.getElementById('timestamp').textContent =
+                'Odczyt: ' + ts.toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw' });
+        }
+    } catch (e) {
+        console.error('Data load error:', e);
+    }
+}
+
+// ── Boost ──
+let boostActive = false;
+
+async function toggleBoost() {
+    const btn = document.getElementById('boost-btn');
+    const status = document.getElementById('boost-status');
+
+    btn.classList.add('loading');
+    status.textContent = 'Wysyłam...';
+
+    try {
+        const resp = await fetch(WORKER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'boost-dhw' }),
+        });
+        const data = await resp.json();
+
+        if (data.status === 'triggered' || data.status === 'cooldown') {
+            boostActive = !boostActive;
+            btn.classList.toggle('active', boostActive);
+            status.textContent = boostActive ? 'Grzanie uruchomione' : '';
+        } else {
+            status.textContent = 'Błąd: ' + (data.error || 'nieznany');
+        }
+    } catch (e) {
+        status.textContent = 'Brak połączenia';
+    }
+
+    btn.classList.remove('loading');
+    setTimeout(() => { status.textContent = ''; }, 5000);
+}
+
+// ── Service Worker ──
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+// ── Init ──
+loadData();
+setInterval(loadData, 60000); // refresh every 60s
+</script>
+
+</body>
+</html>

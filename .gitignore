@@ -4,3 +4,9 @@ __pycache__/
 .env
 *.json
 !package.json
+!wanna/manifest.json
+.DS_Store
+wanna/Video_bez_kaczuszki.mp4
+wanna/video/
+wanna/logo.af
+wanna/*.af~lock~

@@ -1,0 +1,34 @@
+name: DHW Boost
+
+on:
+  repository_dispatch:
+    types: [boost-dhw]
+  workflow_dispatch:
+
+env:
+  VAILLANT_USERNAME: ${{ secrets.VAILLANT_USERNAME }}
+  VAILLANT_PASSWORD: ${{ secrets.VAILLANT_PASSWORD }}
+  VAILLANT_BRAND: vaillant
+  VAILLANT_COUNTRY: poland
+
+permissions:
+  contents: read
+
+jobs:
+  boost:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Boost domestic hot water
+        run: python boost_dhw.py

@@ -720,7 +720,7 @@ document.querySelectorAll('.btn[data-range]').forEach(btn => {
 const TRIGGER_URL = 'https://vaillant-trigger.konrad-makosa.workers.dev';
 
 function triggerDataLog() {
-    fetch(TRIGGER_URL, { method: 'POST' }).catch(() => {});
+    fetch(TRIGGER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'log-data' }) }).catch(() => {});
 }
 
 (async function init() {
