@@ -407,9 +407,16 @@ async function discoverEggs() {
 function tryShowEgg() {
     if (knownEggs.length === 0) return;
     const overlay = document.getElementById('egg-overlay');
-    // probability: 1 egg = 50%, 2 eggs = 33%, 3 eggs = 25% ...
-    if (Math.random() > 1 / (knownEggs.length + 1)) return;
-    const src = knownEggs[Math.floor(Math.random() * knownEggs.length)];
+    if (!overlay) return;
+    const roll = Math.random();
+    const threshold = 1 / (knownEggs.length + 1);
+    if (roll > threshold) {
+        console.log(`🥚 roll ${roll.toFixed(2)} > ${threshold.toFixed(2)} — skip`);
+        return;
+    }
+    const idx = Math.floor(Math.random() * knownEggs.length);
+    const src = knownEggs[idx];
+    console.log(`🥚 roll ${roll.toFixed(2)} ≤ ${threshold.toFixed(2)} — showing ${src}`);
     overlay.src = src;
     overlay.classList.add('visible');
     setTimeout(() => {
