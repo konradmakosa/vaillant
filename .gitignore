@@ -8,5 +8,12 @@ __pycache__/
 .DS_Store
 wanna/Video_bez_kaczuszki.mp4
 wanna/video/
+wanna/eggs/*.mov
+wanna/*.mov
+wanna/*.mp4
+!wanna/wanna_background.mp4
+wanna/*.png
+!wanna/icon-192.png
+!wanna/icon-512.png
 wanna/logo.af
 wanna/*.af~lock~
