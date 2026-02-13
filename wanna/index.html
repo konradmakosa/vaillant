@@ -419,7 +419,11 @@ function tryShowEgg() {
     console.log(`🥚 roll ${roll.toFixed(2)} ≤ ${threshold.toFixed(2)} — showing ${src}`);
     overlay.src = src;
     overlay.classList.add('visible');
-    overlay.play();
+    const p = overlay.play();
+    if (p) p.catch(() => {
+        overlay.classList.remove('visible');
+        overlay.removeAttribute('src');
+    });
     overlay.onended = () => {
         overlay.classList.remove('visible');
         overlay.removeAttribute('src');
