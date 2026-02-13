@@ -390,12 +390,13 @@ if ('serviceWorker' in navigator) {
 // ── Easter eggs ──
 const EGG_COUNT = 20; // max egg numbers to check
 const EGG_INTERVAL = 20000; // 20s between rolls
+const EGG_VER = 2; // bump to bust cache
 let knownEggs = []; // array of egg numbers (1, 2, 3...)
 
 async function discoverEggs() {
     for (let i = 1; i <= EGG_COUNT; i++) {
         try {
-            const resp = await fetch(`eggs/${i}.mp4`, { method: 'HEAD' });
+            const resp = await fetch(`eggs/${i}.mp4?v=${EGG_VER}`, { method: 'HEAD' });
             const ct = resp.headers.get('content-type') || '';
             if (resp.ok && ct.includes('video')) knownEggs.push(i);
         } catch (_) {}
@@ -415,7 +416,7 @@ function tryShowEgg() {
     }
     const num = knownEggs[pick];
     console.log(`🥚 pick ${pick}/${knownEggs.length} — showing egg ${num}`);
-    overlay.src = `eggs/${num}.mp4`;
+    overlay.src = `eggs/${num}.mp4?v=${EGG_VER}`;
     overlay.classList.add('visible');
     const p = overlay.play();
     if (p) p.catch(() => {
