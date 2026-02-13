@@ -415,26 +415,16 @@ function tryShowEgg() {
     }
     const num = knownEggs[pick];
     console.log(`🥚 pick ${pick}/${knownEggs.length} — showing egg ${num}`);
-    // multi-source: HEVC+alpha for Safari, VP9+alpha for Chrome
-    overlay.innerHTML = '';
-    const srcMp4 = document.createElement('source');
-    srcMp4.src = `eggs/${num}.mp4`;
-    srcMp4.type = "video/mp4; codecs='hvc1'";
-    const srcWebm = document.createElement('source');
-    srcWebm.src = `eggs/${num}.webm`;
-    srcWebm.type = 'video/webm';
-    overlay.appendChild(srcMp4);
-    overlay.appendChild(srcWebm);
-    overlay.load();
+    overlay.src = `eggs/${num}.mp4`;
     overlay.classList.add('visible');
     const p = overlay.play();
     if (p) p.catch(() => {
         overlay.classList.remove('visible');
-        overlay.innerHTML = '';
+        overlay.removeAttribute('src');
     });
     overlay.onended = () => {
         overlay.classList.remove('visible');
-        overlay.innerHTML = '';
+        overlay.removeAttribute('src');
         overlay.onended = null;
     };
 }
