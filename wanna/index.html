@@ -224,7 +224,7 @@
 </video>
 
 <!-- Layer 1.5: Easter egg overlay -->
-<img class="egg-overlay" id="egg-overlay" alt="">
+<video class="egg-overlay" id="egg-overlay" muted playsinline></video>
 
 <!-- Layer 3: Temperature circles -->
 <div class="temp-circle circle-water" id="c-water">
@@ -396,9 +396,9 @@ let knownEggs = [];
 async function discoverEggs() {
     for (let i = 1; i <= EGG_COUNT; i++) {
         try {
-            const resp = await fetch(`eggs/${i}.webp`, { method: 'HEAD' });
+            const resp = await fetch(`eggs/${i}.webm`, { method: 'HEAD' });
             const ct = resp.headers.get('content-type') || '';
-            if (resp.ok && ct.includes('image')) knownEggs.push(`eggs/${i}.webp`);
+            if (resp.ok && ct.includes('video')) knownEggs.push(`eggs/${i}.webm`);
         } catch (_) {}
     }
     console.log(`Easter eggs found: ${knownEggs.length}`);
@@ -419,10 +419,12 @@ function tryShowEgg() {
     console.log(`🥚 roll ${roll.toFixed(2)} ≤ ${threshold.toFixed(2)} — showing ${src}`);
     overlay.src = src;
     overlay.classList.add('visible');
-    setTimeout(() => {
+    overlay.play();
+    overlay.onended = () => {
         overlay.classList.remove('visible');
         overlay.removeAttribute('src');
-    }, 5000);
+        overlay.onended = null;
+    };
 }
 
 setInterval(tryShowEgg, EGG_INTERVAL);
