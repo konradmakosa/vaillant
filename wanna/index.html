@@ -408,14 +408,14 @@ function tryShowEgg() {
     if (knownEggs.length === 0) return;
     const overlay = document.getElementById('egg-overlay');
     // probability: 1 egg = 50%, 2 eggs = 33%, 3 eggs = 25% ...
-    if (Math.random() > 1 / (knownEggs.length + 1)) {
-        overlay.classList.remove('visible');
-        overlay.removeAttribute('src');
-        return;
-    }
+    if (Math.random() > 1 / (knownEggs.length + 1)) return;
     const src = knownEggs[Math.floor(Math.random() * knownEggs.length)];
     overlay.src = src;
     overlay.classList.add('visible');
+    setTimeout(() => {
+        overlay.classList.remove('visible');
+        overlay.removeAttribute('src');
+    }, 5000);
 }
 
 setInterval(tryShowEgg, EGG_INTERVAL);
