@@ -331,19 +331,16 @@ function updateBoostUI() {
     if (remaining > 0) {
         btn.classList.add('active');
         btn.classList.add('loading');
-        const min = Math.ceil(remaining / 60000);
-        status.textContent = `Grzeje ${min} min`;
         if (!boostTimer) {
-            boostTimer = setInterval(updateBoostUI, 10000);
+            boostTimer = setTimeout(() => {
+                btn.classList.remove('active');
+                btn.classList.remove('loading');
+                boostTimer = null;
+            }, remaining);
         }
     } else {
         btn.classList.remove('active');
         btn.classList.remove('loading');
-        status.textContent = '';
-        if (boostTimer) {
-            clearInterval(boostTimer);
-            boostTimer = null;
-        }
     }
 }
 

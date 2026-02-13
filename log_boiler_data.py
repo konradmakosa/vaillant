@@ -46,6 +46,7 @@ CSV_HEADERS = [
     "dhw_current_temp_c",
     "dhw_target_temp_c",
     "dhw_operation_mode",
+    "dhw_current_special_function",
 ]
 
 
@@ -90,6 +91,7 @@ async def read_boiler_data():
                         "dhw_current_temp_c": dhw.current_dhw_temperature if dhw else None,
                         "dhw_target_temp_c": dhw.tapping_setpoint if dhw else None,
                         "dhw_operation_mode": dhw.operation_mode_dhw if dhw else None,
+                        "dhw_current_special_function": dhw.current_special_function if dhw else None,
                     }
                     rows.append(row)
 

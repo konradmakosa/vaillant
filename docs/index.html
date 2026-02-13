@@ -526,6 +526,24 @@ function buildChart(data) {
                     order: 10,
                 },
                 {
+                    label: 'Boost CWU',
+                    data: data.map(r => {
+                        const sf = r.dhw_current_special_function || '';
+                        return sf.toUpperCase().includes('BOOST') || sf.toUpperCase().includes('CYLINDER') ? 1 : 0;
+                    }),
+                    type: 'bar',
+                    borderColor: 'transparent',
+                    backgroundColor: data.map(r => {
+                        const sf = r.dhw_current_special_function || '';
+                        return sf.toUpperCase().includes('BOOST') || sf.toUpperCase().includes('CYLINDER')
+                            ? 'rgba(255, 213, 79, 0.18)' : 'transparent';
+                    }),
+                    yAxisID: 'yHeating',
+                    barPercentage: 1.0,
+                    categoryPercentage: 1.0,
+                    order: 11,
+                },
+                {
                     label: 'Temp. przepływu [°C]',
                     data: data.map(r => num(r.circuit_flow_temp_c)),
                     borderColor: '#ff5722',
