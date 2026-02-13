@@ -388,17 +388,16 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── Easter eggs ──
-const EGG_COUNT = 20; // max files to check (1.webp .. n.webp)
+const EGG_COUNT = 20; // max egg numbers to check
 const EGG_INTERVAL = 20000; // 20s between rolls
-const EGG_DISPLAY = 0; // 0 = show full duration of GIF cycle
-let knownEggs = [];
+let knownEggs = []; // array of egg numbers (1, 2, 3...)
 
 async function discoverEggs() {
     for (let i = 1; i <= EGG_COUNT; i++) {
         try {
-            const resp = await fetch(`eggs/${i}.webm`, { method: 'HEAD' });
+            const resp = await fetch(`eggs/${i}.mp4`, { method: 'HEAD' });
             const ct = resp.headers.get('content-type') || '';
-            if (resp.ok && ct.includes('video')) knownEggs.push(`eggs/${i}.webm`);
+            if (resp.ok && ct.includes('video')) knownEggs.push(i);
         } catch (_) {}
     }
     console.log(`Easter eggs found: ${knownEggs.length}`);
@@ -414,18 +413,28 @@ function tryShowEgg() {
         console.log(`🥚 pick ${pick}/${knownEggs.length} — skip`);
         return;
     }
-    const src = knownEggs[pick];
-    console.log(`🥚 pick ${pick}/${knownEggs.length} — showing ${src}`);
-    overlay.src = src;
+    const num = knownEggs[pick];
+    console.log(`🥚 pick ${pick}/${knownEggs.length} — showing egg ${num}`);
+    // multi-source: HEVC+alpha for Safari, VP9+alpha for Chrome
+    overlay.innerHTML = '';
+    const srcMp4 = document.createElement('source');
+    srcMp4.src = `eggs/${num}.mp4`;
+    srcMp4.type = "video/mp4; codecs='hvc1'";
+    const srcWebm = document.createElement('source');
+    srcWebm.src = `eggs/${num}.webm`;
+    srcWebm.type = 'video/webm';
+    overlay.appendChild(srcMp4);
+    overlay.appendChild(srcWebm);
+    overlay.load();
     overlay.classList.add('visible');
     const p = overlay.play();
     if (p) p.catch(() => {
         overlay.classList.remove('visible');
-        overlay.removeAttribute('src');
+        overlay.innerHTML = '';
     });
     overlay.onended = () => {
         overlay.classList.remove('visible');
-        overlay.removeAttribute('src');
+        overlay.innerHTML = '';
         overlay.onended = null;
     };
 }
