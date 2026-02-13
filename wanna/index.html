@@ -17,45 +17,42 @@
             width: 100%; height: 100%;
             overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
-            background: #0a1628;
+            background: #1a1a2e;
             color: #fff;
             -webkit-user-select: none;
             user-select: none;
         }
 
-        /* ── Layer 1: Video background ── */
+        /* ── Layer 1: Video background — full brightness ── */
         .bg-video {
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
             object-fit: cover;
             z-index: 0;
-            opacity: 0.55;
         }
 
-        /* ── Layer 2: Steam / mist overlay ── */
-        .steam-overlay {
+        /* ── Layer 1.5: Easter egg GIF overlay ── */
+        .egg-overlay {
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            z-index: 1;
+            object-fit: cover;
+            z-index: 0;
             pointer-events: none;
-            background:
-                radial-gradient(ellipse at 30% 80%, rgba(100, 180, 255, 0.08) 0%, transparent 60%),
-                radial-gradient(ellipse at 70% 20%, rgba(255, 255, 255, 0.04) 0%, transparent 50%);
-            animation: steamDrift 12s ease-in-out infinite alternate;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
         }
 
-        @keyframes steamDrift {
-            0%   { opacity: 0.6; transform: translateY(0) scale(1); }
-            100% { opacity: 1;   transform: translateY(-8px) scale(1.02); }
+        .egg-overlay.visible {
+            opacity: 1;
         }
 
-        /* Floating steam particles */
+        /* ── Layer 2: Subtle steam particles ── */
         .particle {
             position: fixed;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%);
+            background: radial-gradient(circle, rgba(255,255,255,0.12), transparent 70%);
             z-index: 1;
             pointer-events: none;
             animation: float linear infinite;
@@ -63,109 +60,110 @@
 
         @keyframes float {
             0%   { transform: translateY(0) scale(1); opacity: 0; }
-            10%  { opacity: 1; }
-            90%  { opacity: 1; }
+            10%  { opacity: 0.8; }
+            90%  { opacity: 0.8; }
             100% { transform: translateY(-100vh) scale(0.3); opacity: 0; }
         }
 
-        /* ── Layer 3: Content ── */
-        .content {
-            position: relative;
+        /* ── Layer 3: Temperature circles ── */
+        .temp-circle {
+            position: fixed;
             z-index: 2;
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100%;
-            padding: 60px 24px 40px;
-            gap: 20px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.2s;
         }
 
-        .app-title {
-            font-size: 14px;
-            font-weight: 500;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            color: rgba(255, 255, 255, 0.5);
-            margin-bottom: 4px;
+        .temp-circle:active {
+            transform: scale(0.9);
         }
 
-        /* Temperature cards */
-        .temp-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            width: 100%;
-            max-width: 340px;
+        .circle-water  { animation: drift1 8s ease-in-out infinite alternate; }
+        .circle-room    { animation: drift2 10s ease-in-out infinite alternate; }
+        .circle-outdoor { animation: drift3 9s ease-in-out infinite alternate; }
+
+        @keyframes drift1 {
+            0%   { transform: translate(0, 0); }
+            33%  { transform: translate(8px, -6px); }
+            66%  { transform: translate(-5px, 10px); }
+            100% { transform: translate(7px, 5px); }
         }
 
-        .temp-card {
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 16px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            transition: transform 0.2s, background 0.2s;
+        @keyframes drift2 {
+            0%   { transform: translate(0, 0); }
+            33%  { transform: translate(-7px, 8px); }
+            66%  { transform: translate(9px, -4px); }
+            100% { transform: translate(-6px, -7px); }
         }
 
-        .temp-card:active {
-            transform: scale(0.97);
-            background: rgba(255, 255, 255, 0.12);
+        @keyframes drift3 {
+            0%   { transform: translate(0, 0); }
+            33%  { transform: translate(6px, 7px); }
+            66%  { transform: translate(-8px, -5px); }
+            100% { transform: translate(4px, -9px); }
         }
 
-        .temp-label {
-            font-size: 13px;
-            font-weight: 500;
-            color: rgba(255, 255, 255, 0.65);
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .temp-circle .val {
+            font-size: 30px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
         }
 
-        .temp-label .icon {
-            font-size: 20px;
-        }
-
-        .temp-value {
-            font-size: 28px;
-            font-weight: 300;
-            letter-spacing: -1px;
-        }
-
-        .temp-value .unit {
+        .temp-circle .val .unit {
             font-size: 16px;
             font-weight: 400;
-            color: rgba(255, 255, 255, 0.5);
+            opacity: 0.7;
+            vertical-align: super;
+            line-height: 0;
         }
 
-        /* Color accents */
-        .temp-card.dhw .temp-value { color: #ff6b9d; }
-        .temp-card.flow .temp-value { color: #ff8a50; }
-        .temp-card.room .temp-value { color: #ffd54f; }
-        .temp-card.outdoor .temp-value { color: #64b5f6; }
-        .temp-card.pressure .temp-value { color: #4dd0e1; }
-
-        /* ── Layer 4: Boost button ── */
-        .boost-section {
-            margin-top: auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
+        /* Water — blue, on the bath */
+        .circle-water {
+            left: 13%;
+            top: 64%;
+            background: rgba(66, 165, 245, 0.6);
+            border-color: rgba(66, 165, 245, 0.5);
         }
+        .circle-water .val { color: #fff; }
 
+        /* Room — yellow, on the ceiling */
+        .circle-room {
+            left: 19%;
+            top: 24%;
+            background: rgba(255, 213, 79, 0.6);
+            border-color: rgba(255, 213, 79, 0.5);
+        }
+        .circle-room .val { color: #fff; }
+
+        /* Outdoor — green, on the window */
+        .circle-outdoor {
+            left: 47%;
+            top: 13%;
+            background: rgba(129, 199, 132, 0.6);
+            border-color: rgba(129, 199, 132, 0.5);
+        }
+        .circle-outdoor .val { color: #fff; }
+
+        /* ── Layer 4: Boost button — bottom right ── */
         .boost-btn {
-            width: 80px;
-            height: 80px;
+            position: fixed;
+            z-index: 3;
+            bottom: 40px;
+            right: 24px;
+            width: 64px;
+            height: 64px;
             border-radius: 50%;
             border: 2px solid rgba(255, 107, 157, 0.4);
-            background: rgba(255, 107, 157, 0.12);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
+            background: rgba(255, 107, 157, 0.15);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             color: #ff6b9d;
             font-size: 32px;
             display: flex;
@@ -173,64 +171,47 @@
             justify-content: center;
             cursor: pointer;
             transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
         }
 
         .boost-btn:active {
-            transform: scale(0.9);
-            background: rgba(255, 107, 157, 0.3);
+            transform: scale(0.85);
+            background: rgba(255, 107, 157, 0.35);
         }
 
         .boost-btn.active {
             border-color: rgba(255, 107, 157, 0.8);
-            background: rgba(255, 107, 157, 0.25);
+            background: rgba(255, 107, 157, 0.3);
             animation: pulse 2s ease-in-out infinite;
         }
 
         .boost-btn.loading {
             pointer-events: none;
-            opacity: 0.6;
+            opacity: 0.5;
         }
 
         @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 157, 0.3); }
-            50%      { box-shadow: 0 0 0 16px rgba(255, 107, 157, 0); }
-        }
-
-        .boost-label {
-            font-size: 11px;
-            font-weight: 500;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            color: rgba(255, 255, 255, 0.4);
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 157, 0.4); }
+            50%      { box-shadow: 0 0 0 14px rgba(255, 107, 157, 0); }
         }
 
         .boost-status {
-            font-size: 11px;
-            color: rgba(255, 107, 157, 0.7);
-            height: 16px;
-        }
-
-        /* Timestamp */
-        .timestamp {
+            position: fixed;
+            z-index: 3;
+            bottom: 110px;
+            right: 12px;
             font-size: 10px;
-            color: rgba(255, 255, 255, 0.25);
+            color: rgba(255, 107, 157, 0.8);
             text-align: center;
-            margin-top: 8px;
+            width: 88px;
         }
 
-        /* Loading state */
-        .loading-text {
-            color: rgba(255, 255, 255, 0.3);
-            font-size: 13px;
-        }
-
-        /* Safe area padding for notch */
-        @supports (padding-top: env(safe-area-inset-top)) {
-            .content {
-                padding-top: calc(60px + env(safe-area-inset-top));
-                padding-bottom: calc(40px + env(safe-area-inset-bottom));
+        /* Safe area for notch/home indicator */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .boost-btn {
+                bottom: calc(40px + env(safe-area-inset-bottom));
+            }
+            .boost-status {
+                bottom: calc(110px + env(safe-area-inset-bottom));
             }
         }
     </style>
@@ -242,45 +223,23 @@
     <source src="wanna_background.mp4" type="video/mp4">
 </video>
 
-<!-- Layer 2: Steam overlay -->
-<div class="steam-overlay"></div>
+<!-- Layer 1.5: Easter egg overlay -->
+<img class="egg-overlay" id="egg-overlay" alt="">
 
-<!-- Layer 3: Content -->
-<div class="content">
-    <div class="app-title">Wanna</div>
-
-    <div class="temp-grid">
-        <div class="temp-card dhw">
-            <div class="temp-label"><span class="icon">🚿</span> Ciepła woda</div>
-            <div class="temp-value" id="v-dhw"><span class="loading-text">—</span></div>
-        </div>
-        <div class="temp-card flow">
-            <div class="temp-label"><span class="icon">🔥</span> Przepływ</div>
-            <div class="temp-value" id="v-flow"><span class="loading-text">—</span></div>
-        </div>
-        <div class="temp-card room">
-            <div class="temp-label"><span class="icon">🏠</span> Pomieszczenie</div>
-            <div class="temp-value" id="v-room"><span class="loading-text">—</span></div>
-        </div>
-        <div class="temp-card outdoor">
-            <div class="temp-label"><span class="icon">🌡️</span> Na zewnątrz</div>
-            <div class="temp-value" id="v-outdoor"><span class="loading-text">—</span></div>
-        </div>
-        <div class="temp-card pressure">
-            <div class="temp-label"><span class="icon">💧</span> Ciśnienie</div>
-            <div class="temp-value" id="v-pressure"><span class="loading-text">—</span></div>
-        </div>
-    </div>
-
-    <!-- Layer 4: Boost button -->
-    <div class="boost-section">
-        <button class="boost-btn" id="boost-btn" onclick="toggleBoost()">♨️</button>
-        <div class="boost-label">Grzej wodę</div>
-        <div class="boost-status" id="boost-status"></div>
-    </div>
-
-    <div class="timestamp" id="timestamp"></div>
+<!-- Layer 3: Temperature circles -->
+<div class="temp-circle circle-water" id="c-water">
+    <div class="val" id="v-dhw">—</div>
 </div>
+<div class="temp-circle circle-room" id="c-room">
+    <div class="val" id="v-room">—</div>
+</div>
+<div class="temp-circle circle-outdoor" id="c-outdoor">
+    <div class="val" id="v-outdoor">—</div>
+</div>
+
+<!-- Layer 4: Boost button -->
+<button class="boost-btn" id="boost-btn" onclick="toggleBoost()">♨️</button>
+<div class="boost-status" id="boost-status"></div>
 
 <script>
 // ── Config ──
@@ -323,18 +282,14 @@ function parseCSV(text) {
     return row;
 }
 
-function setVal(id, val, unit) {
+function setCircle(id, val, unit) {
     const el = document.getElementById(id);
     if (!el) return;
-    if (val === undefined || val === null || val === '' || val === 'None') {
-        el.innerHTML = '<span class="loading-text">—</span>';
+    const n = parseFloat(val);
+    if (isNaN(n) || val === '' || val === 'None') {
+        el.textContent = '—';
     } else {
-        const n = parseFloat(val);
-        if (isNaN(n)) {
-            el.innerHTML = '<span class="loading-text">—</span>';
-        } else {
-            el.innerHTML = n.toFixed(1) + '<span class="unit"> ' + unit + '</span>';
-        }
+        el.innerHTML = n.toFixed(1) + '<span class="unit">' + unit + '</span>';
     }
 }
 
@@ -346,17 +301,9 @@ async function loadData() {
         const row = parseCSV(text);
         if (!row) return;
 
-        setVal('v-dhw', row.dhw_current_temp_c, '°C');
-        setVal('v-flow', row.circuit_flow_temp_c, '°C');
-        setVal('v-room', row.zone_current_temp_c, '°C');
-        setVal('v-outdoor', row.outdoor_temp_c, '°C');
-        setVal('v-pressure', row.water_pressure_bar, 'bar');
-
-        if (row.timestamp) {
-            const ts = new Date(row.timestamp + 'Z');
-            document.getElementById('timestamp').textContent =
-                'Odczyt: ' + ts.toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw' });
-        }
+        setCircle('v-dhw', row.dhw_current_temp_c, '°');
+        setCircle('v-room', row.zone_current_temp_c, '°');
+        setCircle('v-outdoor', row.outdoor_temp_c, '°');
     } catch (e) {
         console.error('Data load error:', e);
     }
@@ -400,9 +347,41 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 
+// ── Easter eggs ──
+const EGG_COUNT = 20; // max files to check (1.webp .. n.webp)
+const EGG_INTERVAL = 30000; // 30s between swaps
+const EGG_DISPLAY = 0; // 0 = show full duration of GIF cycle
+let knownEggs = [];
+
+async function discoverEggs() {
+    for (let i = 1; i <= EGG_COUNT; i++) {
+        try {
+            const resp = await fetch(`eggs/${i}.webp`, { method: 'HEAD' });
+            if (resp.ok) knownEggs.push(`eggs/${i}.webp`);
+        } catch (_) {}
+    }
+    if (knownEggs.length > 0) showRandomEgg();
+}
+
+function showRandomEgg() {
+    const overlay = document.getElementById('egg-overlay');
+    const src = knownEggs[Math.floor(Math.random() * knownEggs.length)];
+    overlay.src = src;
+    overlay.classList.add('visible');
+    // Keep visible for the interval, then fade out briefly before next
+    setTimeout(() => {
+        overlay.classList.remove('visible');
+    }, EGG_INTERVAL - 2000);
+}
+
+setInterval(() => {
+    if (knownEggs.length > 0) showRandomEgg();
+}, EGG_INTERVAL);
+
 // ── Init ──
 loadData();
-setInterval(loadData, 60000); // refresh every 60s
+setInterval(loadData, 60000);
+discoverEggs();
 </script>
 
 </body>
