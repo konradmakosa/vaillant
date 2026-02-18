@@ -527,21 +527,24 @@ function buildChart(data) {
                 },
                 {
                     label: 'Boost CWU',
-                    data: data.map(r => {
+                    data: data.map((r, i) => {
                         const sf = r.dhw_current_special_function || '';
-                        return sf.toUpperCase().includes('BOOST') || sf.toUpperCase().includes('CYLINDER') ? 1 : 0;
+                        const isBoost = sf.toUpperCase().includes('BOOST') || sf.toUpperCase().includes('CYLINDER');
+                        return isBoost ? num(r.dhw_current_temp_c) : null;
                     }),
-                    type: 'bar',
+                    type: 'line',
                     borderColor: 'transparent',
-                    backgroundColor: data.map(r => {
+                    backgroundColor: '#ffd54f',
+                    pointRadius: data.map(r => {
                         const sf = r.dhw_current_special_function || '';
-                        return sf.toUpperCase().includes('BOOST') || sf.toUpperCase().includes('CYLINDER')
-                            ? 'rgba(255, 213, 79, 0.18)' : 'transparent';
+                        return (sf.toUpperCase().includes('BOOST') || sf.toUpperCase().includes('CYLINDER')) ? 8 : 0;
                     }),
-                    yAxisID: 'yHeating',
-                    barPercentage: 1.0,
-                    categoryPercentage: 1.0,
-                    order: 11,
+                    pointStyle: '🔥',
+                    pointHoverRadius: 12,
+                    borderWidth: 0,
+                    showLine: false,
+                    yAxisID: 'yTemp',
+                    order: 0,
                 },
                 {
                     label: 'Temp. przepływu [°C]',
@@ -602,7 +605,7 @@ function buildChart(data) {
                         font: { size: isMobile ? 9 : 11 },
                         padding: isMobile ? 8 : 16,
                         boxWidth: isMobile ? 20 : 40,
-                        filter: item => item.text !== 'Grzanie',
+                        filter: item => item.text !== 'Grzanie' && item.text !== 'Boost CWU',
                     }
                 },
                 tooltip: {
@@ -617,6 +620,9 @@ function buildChart(data) {
                         label: function(ctx) {
                             const v = ctx.parsed.y;
                             if (v === null) return null;
+                            if (ctx.dataset.label === 'Boost CWU') {
+                                return ` 🔥 Boost CWU: ${v.toFixed(1)}°C`;
+                            }
                             if (ctx.dataset.yAxisID === 'yHeating') {
                                 return ` Grzanie: ${v ? 'TAK' : 'NIE'}`;
                             }

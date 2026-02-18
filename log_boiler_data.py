@@ -138,6 +138,19 @@ def append_to_csv(rows):
 
     file_exists = csv_path.exists()
 
+    # Migrate header if new columns were added
+    if file_exists:
+        with open(csv_path, "r") as f:
+            first_line = f.readline().strip()
+        existing_headers = first_line.split(",")
+        if len(existing_headers) < len(CSV_HEADERS):
+            logger.info(f"Migrating CSV header: {len(existing_headers)} → {len(CSV_HEADERS)} columns")
+            with open(csv_path, "r") as f:
+                all_lines = f.readlines()
+            all_lines[0] = ",".join(CSV_HEADERS) + "\n"
+            with open(csv_path, "w", newline="") as f:
+                f.writelines(all_lines)
+
     with open(csv_path, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
         if not file_exists:
