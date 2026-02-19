@@ -433,6 +433,21 @@ function minMax(arr) {
     return { min: Math.min(...valid), max: Math.max(...valid) };
 }
 
+// Pre-render 🔥 emoji to an Image for Chart.js pointStyle
+const flameImg = (() => {
+    const size = 20;
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.font = `${size - 2}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🔥', size / 2, size / 2);
+    const img = new Image(size, size);
+    img.src = c.toDataURL();
+    return img;
+})();
+
 function updateLiveValues(data) {
     if (data.length === 0) return;
     const last = data[data.length - 1];
@@ -539,7 +554,7 @@ function buildChart(data) {
                         const sf = r.dhw_current_special_function || '';
                         return (sf.toUpperCase().includes('BOOST') || sf.toUpperCase().includes('CYLINDER')) ? 6 : 0;
                     }),
-                    pointStyle: '🔥',
+                    pointStyle: flameImg,
                     pointHoverRadius: 10,
                     borderWidth: 0,
                     showLine: false,
