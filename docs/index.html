@@ -527,23 +527,23 @@ function buildChart(data) {
                 },
                 {
                     label: 'Boost CWU',
-                    data: data.map((r, i) => {
+                    data: data.map(r => {
                         const sf = r.dhw_current_special_function || '';
                         const isBoost = sf.toUpperCase().includes('BOOST') || sf.toUpperCase().includes('CYLINDER');
-                        return isBoost ? num(r.dhw_current_temp_c) : null;
+                        return isBoost ? 0 : null;
                     }),
                     type: 'line',
                     borderColor: 'transparent',
-                    backgroundColor: '#ffd54f',
+                    backgroundColor: 'transparent',
                     pointRadius: data.map(r => {
                         const sf = r.dhw_current_special_function || '';
-                        return (sf.toUpperCase().includes('BOOST') || sf.toUpperCase().includes('CYLINDER')) ? 8 : 0;
+                        return (sf.toUpperCase().includes('BOOST') || sf.toUpperCase().includes('CYLINDER')) ? 6 : 0;
                     }),
                     pointStyle: '🔥',
-                    pointHoverRadius: 12,
+                    pointHoverRadius: 10,
                     borderWidth: 0,
                     showLine: false,
-                    yAxisID: 'yTemp',
+                    yAxisID: 'yBoost',
                     order: 0,
                 },
                 {
@@ -621,7 +621,7 @@ function buildChart(data) {
                             const v = ctx.parsed.y;
                             if (v === null) return null;
                             if (ctx.dataset.label === 'Boost CWU') {
-                                return ` 🔥 Boost CWU: ${v.toFixed(1)}°C`;
+                                return ' 🔥 Ładowanie zasobnika CWU';
                             }
                             if (ctx.dataset.yAxisID === 'yHeating') {
                                 return ` Grzanie: ${v ? 'TAK' : 'NIE'}`;
@@ -671,6 +671,12 @@ function buildChart(data) {
                     display: false,
                     min: 0,
                     max: 1,
+                },
+                yBoost: {
+                    type: 'linear',
+                    display: false,
+                    min: 0,
+                    max: 10,
                 },
                 yTemp: {
                     type: 'linear',
