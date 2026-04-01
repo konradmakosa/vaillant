@@ -1,3 +1,4 @@
 timestamp,water_pressure_bar,outdoor_temp_c,circuit_flow_temp_c,energy_manager_state,circuit_state,connected,zone_name,zone_current_temp_c,zone_target_temp_c,zone_humidity_pct,zone_heating_state,dhw_current_temp_c,dhw_target_temp_c,dhw_operation_mode,dhw_current_special_function
 2026-04-01 01:56:09,1.6,3.15,44.0,HEATING,HEATING,True,ZONE 1,18.0625,18.0,,,43.0,45.0,TIME_CONTROLLED,REGULAR
 2026-04-01 04:40:36,1.6,1.52,42.0,HEATING,HEATING,True,ZONE 1,17.75,18.5,,,40.0,45.0,TIME_CONTROLLED,CYLINDER_BOOST
+2026-04-01 06:16:34,1.2,3.02,34.0,STANDBY,STANDBY,True,ZONE 1,18.0625,17.5,,,47.0,45.0,TIME_CONTROLLED,REGULAR
