@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   VAILLANT_USERNAME: ${{ secrets.VAILLANT_USERNAME }}
   VAILLANT_PASSWORD: ${{ secrets.VAILLANT_PASSWORD }}
   VAILLANT_BRAND: vaillant

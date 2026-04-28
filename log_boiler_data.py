@@ -262,7 +262,8 @@ def main():
                 logger.warning(f"API quota exceeded, retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
                 time.sleep(wait)
             else:
-                logger.error(f"Failed to read boiler data: {e}")
+                import traceback
+                logger.error(f"Failed to read boiler data: {e}\n{traceback.format_exc()}")
                 sys.exit(1)
 
     if not rows:
