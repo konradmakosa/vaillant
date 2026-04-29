@@ -353,14 +353,13 @@ async function toggleBoost() {
     status.textContent = 'Wysyłam...';
 
     try {
-        const resp = await fetch(WORKER_URL, {
+        const resp = await fetch(WORKER_URL + '/boost', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'boost-dhw' }),
         });
         const data = await resp.json();
 
-        if (data.status === 'triggered') {
+        if (data.status === 'ok') {
             setBoostExpiry(Date.now() + BOOST_LOCK_MS);
             updateBoostUI();
         } else if (data.status === 'cooldown') {
