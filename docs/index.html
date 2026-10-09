@@ -238,6 +238,40 @@
         .btn:hover { border-color: var(--vaillant-green); color: var(--vaillant-green); }
         .btn.active { background: var(--vaillant-green); color: #fff; border-color: var(--vaillant-green); }
 
+        .trend-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 12px;
+        }
+
+        .trend-table th {
+            text-align: left;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 10px;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .trend-table td {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .trend-table tr.trend-latest td {
+            background: rgba(0, 166, 81, 0.08);
+            font-weight: 600;
+        }
+
+        .trend-summary {
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--text);
+        }
+
         .footer {
             padding: 16px 32px;
             border-top: 1px solid var(--border);
@@ -346,7 +380,18 @@
         <button class="btn active" data-range="24">24h</button>
         <button class="btn" data-range="72">3 dni</button>
         <button class="btn" data-range="168">7 dni</button>
+        <button class="btn" data-range="720">30 dni</button>
         <button class="btn" data-range="0">Wszystko</button>
+    </div>
+
+    <div class="chart-section" id="trend-section" style="display:none">
+        <div class="chart-title">Ciśnienie zimnej instalacji — trend ubytku wody</div>
+        <div class="chart-subtitle">Odczyty w ciągu doby wahają się o 0.5–1.0 bar wraz z temperaturą wody. Dobowe minimum ≈ ciśnienie zimnej instalacji — pokazuje faktyczny ubytek. Skok w górę = dolewka.</div>
+        <div class="chart-container" style="height:320px">
+            <canvas id="chart-trend"></canvas>
+        </div>
+        <table class="trend-table" id="trend-table"></table>
+        <div class="trend-summary" id="trend-summary"></div>
     </div>
 
     <div class="chart-section">
@@ -367,6 +412,7 @@
     Ładowanie danych z kotła...
 </div>
 
+<script src="pressure-analysis.js"></script>
 <script>
 const CSV_BASE_URL = 'https://raw.githubusercontent.com/konradmakosa/vaillant/main/data/';
 let allData = [];
@@ -407,9 +453,10 @@ function parseCSV(text) {
 async function loadAllData() {
     const now = new Date();
     const months = [];
-    for (let i = 0; i < 3; i++) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        months.push(`boiler_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}.csv`);
+    let y = 2026, m = 2; // data starts 2026-02
+    while (y < now.getFullYear() || (y === now.getFullYear() && m <= now.getMonth() + 1)) {
+        months.push(`boiler_${y}-${String(m).padStart(2, '0')}.csv`);
+        if (++m > 12) { m = 1; y++; }
     }
     const results = await Promise.all(months.map(fetchCSV));
     allData = results.flat().sort((a, b) => a._ts - b._ts);
@@ -496,6 +543,64 @@ function updateLiveValues(data) {
         document.getElementById('status-badge').className = 'status-badge';
     }
 }
+
+// Shared plugin: 1.0 bar warning zone + 1.5 bar guide line on a 'yPressure' scale
+const pressureWarningZone = {
+    id: 'pressureWarningZone',
+    beforeDraw(chart) {
+        const { ctx, chartArea: { left, right }, scales: { yPressure } } = chart;
+        if (!yPressure) return;
+        const y1bar = yPressure.getPixelForValue(1.0);
+        const y0bar = yPressure.getPixelForValue(0);
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 87, 34, 0.06)';
+        ctx.fillRect(left, y1bar, right - left, y0bar - y1bar);
+        ctx.strokeStyle = 'rgba(255, 87, 34, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(left, y1bar);
+        ctx.lineTo(right, y1bar);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255, 87, 34, 0.6)';
+        ctx.font = '10px system-ui';
+        ctx.fillText('min 1.0 bar', left + 6, y1bar - 4);
+        ctx.strokeStyle = 'rgba(0, 166, 81, 0.3)';
+        const y15 = yPressure.getPixelForValue(1.5);
+        ctx.beginPath();
+        ctx.moveTo(left, y15);
+        ctx.lineTo(right, y15);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(0, 166, 81, 0.5)';
+        ctx.fillText('norma 1.5 bar', left + 6, y15 - 4);
+        ctx.restore();
+    }
+};
+
+// Vertical dashed lines marking top-up days on the trend chart
+const topUpLines = {
+    id: 'topUpLines',
+    afterDraw(chart) {
+        const days = chart.$topUpDays || [];
+        if (!days.length) return;
+        const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0, 166, 81, 0.6)';
+        ctx.fillStyle = 'rgba(0, 166, 81, 0.8)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.font = '10px system-ui';
+        for (const d of days) {
+            const px = x.getPixelForValue(d);
+            ctx.beginPath();
+            ctx.moveTo(px, top);
+            ctx.lineTo(px, bottom);
+            ctx.stroke();
+            ctx.fillText('dolewka', px + 4, top + 10);
+        }
+        ctx.restore();
+    }
+};
 
 function buildChart(data) {
     if (combinedChart) combinedChart.destroy();
@@ -713,42 +818,125 @@ function buildChart(data) {
                 }
             }
         },
-        plugins: [{
-            id: 'pressureWarningZone',
-            beforeDraw(chart) {
-                const { ctx, chartArea: { left, right }, scales: { yPressure } } = chart;
-                if (!yPressure) return;
-                const y1bar = yPressure.getPixelForValue(1.0);
-                const y0bar = yPressure.getPixelForValue(0);
-                ctx.save();
-                ctx.fillStyle = 'rgba(255, 87, 34, 0.06)';
-                ctx.fillRect(left, y1bar, right - left, y0bar - y1bar);
-                ctx.strokeStyle = 'rgba(255, 87, 34, 0.4)';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([6, 4]);
-                ctx.beginPath();
-                ctx.moveTo(left, y1bar);
-                ctx.lineTo(right, y1bar);
-                ctx.stroke();
-                ctx.fillStyle = 'rgba(255, 87, 34, 0.6)';
-                ctx.font = '10px system-ui';
-                ctx.fillText('min 1.0 bar', left + 6, y1bar - 4);
-                ctx.strokeStyle = 'rgba(0, 166, 81, 0.3)';
-                const y15 = yPressure.getPixelForValue(1.5);
-                ctx.beginPath();
-                ctx.moveTo(left, y15);
-                ctx.lineTo(right, y15);
-                ctx.stroke();
-                ctx.fillStyle = 'rgba(0, 166, 81, 0.5)';
-                ctx.fillText('norma 1.5 bar', left + 6, y15 - 4);
-                ctx.restore();
-            }
-        }]
+        plugins: [pressureWarningZone]
     });
 }
 
+let trendChart = null;
+
+function dayTs(day) {
+    const [y, m, d] = day.split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+}
+
+// Cold-system pressure trend — always uses ALL data, ignores range filter
+function buildTrend() {
+    const dailyMins = PressureAnalysis.dailyMinimums(allData);
+    const segs = PressureAnalysis.segments(dailyMins);
+    const sumSegs = PressureAnalysis.summary(segs);
+    const section = document.getElementById('trend-section');
+    if (!dailyMins.length) { section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    const isMobile = window.innerWidth < 600;
+    const datasets = [{
+        label: 'Dobowe minimum [bar]',
+        data: dailyMins.map(d => ({ x: dayTs(d.day), y: d.min, d })),
+        borderColor: '#00bcd4',
+        backgroundColor: '#00bcd4',
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        borderWidth: 2,
+        tension: 0.1,
+        trendMeta: 'daily',
+    }];
+    for (const s of segs) {
+        datasets.push({
+            label: `Trend ${s.start}`,
+            data: [
+                { x: dayTs(s.start), y: s.intercept },
+                { x: dayTs(s.end), y: s.intercept + s.slopePerDay * s.spanDays },
+            ],
+            borderColor: '#ff9800',
+            borderDash: [6, 4],
+            borderWidth: 2,
+            pointRadius: 0,
+            trendMeta: 'regression',
+        });
+    }
+
+    if (trendChart) trendChart.destroy();
+    const ctx = document.getElementById('chart-trend').getContext('2d');
+    trendChart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(26, 26, 46, 0.95)',
+                    borderColor: '#2a2a4a',
+                    borderWidth: 1,
+                    displayColors: false,
+                    filter: item => item.dataset.trendMeta === 'daily',
+                    callbacks: {
+                        title: items => items.length ? items[0].raw.d.day : '',
+                        label: item => `min ${item.raw.y.toFixed(1)} bar (${item.raw.d.n} odczytów)`,
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    time: { unit: 'day', tooltipFormat: 'yyyy-MM-dd', displayFormats: { day: 'dd.MM' } },
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#8888aa', maxRotation: 0, font: { size: isMobile ? 9 : 11 } }
+                },
+                yPressure: {
+                    type: 'linear',
+                    position: 'left',
+                    min: 0,
+                    suggestedMax: 3,
+                    title: { display: !isMobile, text: 'Ciśnienie [bar]', color: '#00bcd4', font: { size: 12, weight: '600' } },
+                    grid: { color: 'rgba(0, 188, 212, 0.08)' },
+                    ticks: { color: '#00bcd4', font: { size: isMobile ? 8 : 11 } }
+                }
+            }
+        },
+        plugins: [pressureWarningZone, topUpLines]
+    });
+    trendChart.$topUpDays = segs.filter(s => s.topUp).map(s => dayTs(s.start));
+
+    // Summary table
+    const fmt = v => v.toFixed(2);
+    let html = '<tr><th>Okres</th><th>Start [bar]</th><th>Koniec [bar]</th><th>Dni</th><th>Spadek [bar/tydz]</th><th>Dni &lt; 1.0 bar</th></tr>';
+    sumSegs.forEach((s, i) => {
+        const cls = i === sumSegs.length - 1 ? ' class="trend-latest"' : '';
+        html += `<tr${cls}><td>${s.start} → ${s.end}</td><td>${fmt(s.startMin)}</td><td>${fmt(s.endMin)}</td>` +
+            `<td>${s.days.length}</td><td>${fmt(s.slopePerDay * 7)}</td><td>${s.belowOneCount}</td></tr>`;
+    });
+    document.getElementById('trend-table').innerHTML = html;
+
+    const summaryEl = document.getElementById('trend-summary');
+    if (sumSegs.length >= 2) {
+        const last = sumSegs[sumSegs.length - 1];
+        const prev = sumSegs[sumSegs.length - 2];
+        summaryEl.textContent = `Tempo spadku: ostatni okres ${fmt(last.slopePerDay * 7)} bar/tydz vs wcześniej ${fmt(prev.slopePerDay * 7)} bar/tydz`;
+    } else {
+        summaryEl.textContent = '';
+    }
+}
+
 function refresh() {
-    const filtered = filterByRange(allData, selectedRange);
+    let filtered = filterByRange(allData, selectedRange);
+    if (filtered.length === 0 && selectedRange !== 0) {
+        selectedRange = 0;
+        document.querySelectorAll('.btn[data-range]').forEach(b =>
+            b.classList.toggle('active', b.dataset.range === '0'));
+        filtered = allData;
+    }
     updateLiveValues(filtered);
     buildChart(filtered);
 }
@@ -765,7 +953,7 @@ document.querySelectorAll('.btn[data-range]').forEach(btn => {
 const TRIGGER_URL = 'https://vaillant-trigger.konrad-makosa.workers.dev';
 
 function triggerDataLog() {
-    fetch(TRIGGER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'log-data' }) }).catch(() => {});
+    fetch(TRIGGER_URL + '/trigger', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'log-data' }) }).catch(() => {});
 }
 
 (async function init() {
@@ -778,6 +966,7 @@ function triggerDataLog() {
         return;
     }
     refresh();
+    buildTrend();
 })();
 </script>
 

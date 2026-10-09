@@ -14,6 +14,7 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from myPyllant.api import MyPyllantAPI
 
@@ -29,6 +30,9 @@ PRESSURE_WARNING = float(os.environ.get("PRESSURE_WARNING", "1.0"))
 PRESSURE_CRITICAL = float(os.environ.get("PRESSURE_CRITICAL", "0.8"))
 
 MIN_INTERVAL_SECONDS = int(os.environ.get("MIN_INTERVAL_SECONDS", "900"))  # 15 min
+
+WARSAW_TZ = ZoneInfo("Europe/Warsaw")
+STATUS_SEVERITY = {"OK": 0, "UNKNOWN": 1, "WARNING": 2, "CRITICAL": 3}
 CSV_DIR = Path(os.environ.get("CSV_DIR", "data"))
 CSV_HEADERS = [
     "timestamp",
@@ -107,21 +111,48 @@ async def read_boiler_data():
     return rows, info
 
 
+def last_csv_line():
+    """Return the last data line of the current (or previous) month's CSV, or None."""
+    now = datetime.now(timezone.utc)
+    year, month = now.year, now.month
+    for _ in range(2):
+        csv_path = CSV_DIR / f"boiler_{year:04d}-{month:02d}.csv"
+        if csv_path.exists():
+            try:
+                with open(csv_path, "r") as f:
+                    lines = [l for l in f.read().splitlines() if l.strip()]
+                if len(lines) >= 2:
+                    return lines[-1]
+            except Exception as e:
+                logger.warning(f"Could not read {csv_path}: {e}")
+        month -= 1
+        if month == 0:
+            month, year = 12, year - 1
+    return None
+
+
+def previous_reading():
+    """Return (timestamp_utc, pressure) of the last logged reading, or (None, None)."""
+    line = last_csv_line()
+    if not line:
+        return None, None
+    try:
+        cols = line.split(",")
+        ts = datetime.strptime(cols[0].strip(), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        pressure = float(cols[1]) if len(cols) > 1 and cols[1].strip() else None
+        return ts, pressure
+    except Exception as e:
+        logger.warning(f"Could not parse last CSV row: {e}")
+        return None, None
+
+
 def too_soon():
     """Return True if last CSV entry is less than MIN_INTERVAL_SECONDS ago."""
-    month = datetime.now(timezone.utc).strftime("%Y-%m")
-    csv_path = CSV_DIR / f"boiler_{month}.csv"
-    if not csv_path.exists():
+    line = last_csv_line()
+    if not line:
         return False
     try:
-        with open(csv_path, "r") as f:
-            lines = f.readlines()
-        if len(lines) < 2:
-            return False
-        last_line = lines[-1].strip()
-        if not last_line:
-            last_line = lines[-2].strip()
-        last_ts = datetime.strptime(last_line.split(",")[0], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        last_ts = datetime.strptime(line.split(",")[0].strip(), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
         elapsed = (datetime.now(timezone.utc) - last_ts).total_seconds()
         logger.info(f"Last reading {elapsed:.0f}s ago (min interval: {MIN_INTERVAL_SECONDS}s)")
         return elapsed < MIN_INTERVAL_SECONDS
@@ -162,22 +193,42 @@ def append_to_csv(rows):
     return csv_path
 
 
+def status_for(pressure):
+    """Return pressure status: UNKNOWN / CRITICAL / WARNING / OK."""
+    if pressure is None:
+        return "UNKNOWN"
+    if pressure < PRESSURE_CRITICAL:
+        return "CRITICAL"
+    if pressure < PRESSURE_WARNING:
+        return "WARNING"
+    return "OK"
+
+
+def should_alert(status, prev_ts, prev_pressure, now=None):
+    """Alert if not OK and (no previous reading, severity increased, or new Warsaw day)."""
+    if status == "OK":
+        return False
+    if prev_ts is None:
+        return True
+    if STATUS_SEVERITY[status] > STATUS_SEVERITY[status_for(prev_pressure)]:
+        return True
+    now = now or datetime.now(timezone.utc)
+    return prev_ts.astimezone(WARSAW_TZ).date() != now.astimezone(WARSAW_TZ).date()
+
+
 def check_pressure(info):
     """Check pressure and return (status, report)."""
     pressure = info.get("pressure")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    status = status_for(pressure)
 
-    if pressure is None:
-        status = "UNKNOWN"
+    if status == "UNKNOWN":
         status_line = "CISNIENIE WODY: nie mozna odczytac"
-    elif pressure < PRESSURE_CRITICAL:
-        status = "CRITICAL"
+    elif status == "CRITICAL":
         status_line = f"CISNIENIE WODY KRYTYCZNE: {pressure:.2f} bar"
-    elif pressure < PRESSURE_WARNING:
-        status = "WARNING"
+    elif status == "WARNING":
         status_line = f"NISKIE CISNIENIE WODY: {pressure:.2f} bar"
     else:
-        status = "OK"
         status_line = f"Cisnienie OK: {pressure:.2f} bar"
 
     report = (
@@ -270,7 +321,8 @@ def main():
         logger.error("No data retrieved from boiler.")
         sys.exit(1)
 
-    # 1. Log to CSV
+    # 1. Log to CSV (grab previous reading first for alert de-duplication)
+    prev_ts, prev_pressure = previous_reading()
     csv_path = append_to_csv(rows)
 
     for row in rows:
@@ -288,8 +340,11 @@ def main():
     write_github_summary(status, report)
 
     if status in ("CRITICAL", "WARNING", "UNKNOWN"):
-        send_pushover_alert(report, status)
-        logger.warning(f"Pressure status: {status}")
+        if should_alert(status, prev_ts, prev_pressure):
+            send_pushover_alert(report, status)
+            logger.warning(f"Pressure status: {status} — alert sent")
+        else:
+            logger.warning(f"Pressure {status} persists, alert already sent today")
     else:
         logger.info(f"Pressure status: {status}")
 
