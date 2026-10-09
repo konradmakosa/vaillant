@@ -425,6 +425,7 @@
 <script>
 const CSV_BASE_URL = 'https://raw.githubusercontent.com/konradmakosa/vaillant/main/data/';
 let allData = [];
+let allEvents = [];
 let combinedChart = null;
 let selectedRange = 24;
 
@@ -586,19 +587,21 @@ const pressureWarningZone = {
     }
 };
 
-// Vertical dashed lines marking top-up days on the trend chart
+// Vertical dashed lines marking top-up days (auto-detected) and manual
+// top-up events (exact timestamp, distinct colour) on the charts
 const topUpLines = {
     id: 'topUpLines',
     afterDraw(chart) {
         const days = chart.$topUpDays || [];
-        if (!days.length) return;
-        const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+        const events = chart.$topUpEvents || [];
+        if (!days.length && !events.length) return;
+        const { ctx, chartArea: { top, bottom, left, right }, scales: { x } } = chart;
         ctx.save();
-        ctx.strokeStyle = 'rgba(0, 166, 81, 0.6)';
-        ctx.fillStyle = 'rgba(0, 166, 81, 0.8)';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
         ctx.font = '10px system-ui';
+        ctx.strokeStyle = 'rgba(0, 166, 81, 0.6)';
+        ctx.fillStyle = 'rgba(0, 166, 81, 0.8)';
         for (const d of days) {
             const px = x.getPixelForValue(d);
             ctx.beginPath();
@@ -607,9 +610,28 @@ const topUpLines = {
             ctx.stroke();
             ctx.fillText('dolewka', px + 4, top + 10);
         }
+        ctx.strokeStyle = 'rgba(79, 195, 247, 0.7)';
+        ctx.fillStyle = 'rgba(79, 195, 247, 0.9)';
+        for (const e of events) {
+            const px = x.getPixelForValue(e.x);
+            if (px < left || px > right) continue;
+            ctx.beginPath();
+            ctx.moveTo(px, top);
+            ctx.lineTo(px, bottom);
+            ctx.stroke();
+            ctx.fillText(e.label || 'dolewka', px + 4, top + 22);
+        }
         ctx.restore();
     }
 };
+
+function topUpEventMarkers(events) {
+    return (events || []).filter(e => e.type === 'topup').map(e => ({
+        x: e.ts.getTime(),
+        label: (e.before != null && e.after != null)
+            ? `dolewka ${e.before}→${e.after} bar` : 'dolewka',
+    }));
+}
 
 function buildChart(data) {
     if (combinedChart) combinedChart.destroy();
@@ -827,8 +849,9 @@ function buildChart(data) {
                 }
             }
         },
-        plugins: [pressureWarningZone]
+        plugins: [pressureWarningZone, topUpLines]
     });
+    combinedChart.$topUpEvents = topUpEventMarkers(allEvents);
 }
 
 let trendChart = null;
@@ -839,8 +862,8 @@ function dayTs(day) {
 }
 
 // Cold-system pressure trend — always uses ALL data, ignores range filter
-function buildTrend(dailyMins) {
-    const segs = PressureAnalysis.segments(dailyMins);
+function buildTrend(dailyMins, manualTopUpDays) {
+    const segs = PressureAnalysis.segments(dailyMins, manualTopUpDays || []);
     const sumSegs = PressureAnalysis.summary(segs);
     const section = document.getElementById('trend-section');
     if (!dailyMins.length) { section.style.display = 'none'; return; }
@@ -915,14 +938,15 @@ function buildTrend(dailyMins) {
         },
         plugins: [pressureWarningZone, topUpLines]
     });
-    trendChart.$topUpDays = segs.filter(s => s.topUp).map(s => dayTs(s.start));
+    trendChart.$topUpDays = segs.filter(s => s.topUp && !s.manual).map(s => dayTs(s.start));
+    trendChart.$topUpEvents = topUpEventMarkers(allEvents);
 
     // Summary table
     const fmt = v => v.toFixed(2);
     let html = '<tr><th>Okres</th><th>Start [bar]</th><th>Koniec [bar]</th><th>Dni</th><th>Spadek [bar/tydz]</th><th>Dni &lt; 1.0 bar</th></tr>';
     sumSegs.forEach((s, i) => {
         const cls = i === sumSegs.length - 1 ? ' class="trend-latest"' : '';
-        html += `<tr${cls}><td>${s.start} → ${s.end}</td><td>${fmt(s.startMin)}</td><td>${fmt(s.endMin)}</td>` +
+        html += `<tr${cls}><td>${s.start} → ${s.end}${s.manual ? ' (ręcznie)' : ''}</td><td>${fmt(s.startMin)}</td><td>${fmt(s.endMin)}</td>` +
             `<td>${s.days.length}</td><td>${fmt(s.slopePerDay * 7)}</td><td>${s.belowOneCount}</td></tr>`;
     });
     document.getElementById('trend-table').innerHTML = html;
@@ -1081,6 +1105,10 @@ function triggerDataLog() {
 (async function init() {
     triggerDataLog();
     await loadAllData();
+    allEvents = await fetch('events.csv?t=' + Date.now())
+        .then(r => (r.ok ? r.text() : ''))
+        .then(PressureAnalysis.parseEvents)
+        .catch(() => []);
     document.getElementById('loading').style.display = 'none';
     if (allData.length === 0) {
         document.getElementById('loading').style.display = 'block';
@@ -1089,7 +1117,7 @@ function triggerDataLog() {
     }
     refresh();
     const dailyMins = PressureAnalysis.dailyMinimums(allData);
-    buildTrend(dailyMins);
+    buildTrend(dailyMins, allEvents.filter(e => e.type === 'topup').map(e => e.day));
     buildSwing(dailyMins);
 })();
 </script>

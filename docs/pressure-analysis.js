@@ -29,17 +29,57 @@
             .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
     }
 
-    // Splits daily minimums into segments; a jump up of >= 0.5 bar = top-up.
-    function segments(dailyMins) {
-        const segs = [];
-        for (const d of dailyMins) {
-            const last = segs.length ? segs[segs.length - 1].days : null;
-            if (last && d.min - last[last.length - 1].min >= 0.5) {
-                segs.push({ days: [], topUp: true });
-            }
-            if (!segs.length) segs.push({ days: [], topUp: false });
-            segs[segs.length - 1].days.push(d);
+    // Parses events.csv -> [{ ts: Date(UTC), type, before, after, note, day }]
+    function parseEvents(text) {
+        const events = [];
+        for (const line of String(text || '').split('\n')) {
+            const t = line.trim();
+            if (!t || t.startsWith('timestamp_utc')) continue;
+            const parts = t.split(',');
+            if (parts.length < 4) continue;
+            const ts = new Date(parts[0].trim() + 'Z');
+            if (isNaN(ts)) continue;
+            const num = v => (v === '' || v == null ? null : parseFloat(v));
+            events.push({
+                ts,
+                type: (parts[1] || '').trim(),
+                before: num((parts[2] || '').trim()),
+                after: num((parts[3] || '').trim()),
+                note: parts.slice(4).join(',').trim(),
+                day: ts.toLocaleDateString('sv-SE', { timeZone: TZ }),
+            });
         }
+        return events;
+    }
+
+    // Splits daily minimums into segments; a jump up of >= 0.5 bar = top-up.
+    // manualTopUpDays: 'YYYY-MM-DD' (Warsaw) — forces a new segment at the first
+    // daily-min entry AFTER that day (the event day keeps its pre-refill minimum).
+    function segments(dailyMins, manualTopUpDays = []) {
+        const autoIdx = new Set();
+        for (let i = 1; i < dailyMins.length; i++) {
+            if (dailyMins[i].min - dailyMins[i - 1].min >= 0.5) autoIdx.add(i);
+        }
+        // manual event on day D: covered if an auto boundary already sits on the
+        // first day >= D; otherwise force a split at the first day > D
+        const forced = new Set();
+        const coincident = new Set();
+        for (const D of manualTopUpDays) {
+            const j = dailyMins.findIndex(d => d.day >= D);
+            if (j > 0 && autoIdx.has(j)) { coincident.add(j); continue; }
+            const k = dailyMins.findIndex(d => d.day > D);
+            if (k > 0) forced.add(k);
+        }
+        const segs = [];
+        dailyMins.forEach((d, i) => {
+            const last = segs.length ? segs[segs.length - 1].days : null;
+            const boundary = autoIdx.has(i) || forced.has(i);
+            if (last && boundary) {
+                segs.push({ days: [], topUp: true, manual: forced.has(i) || coincident.has(i) });
+            }
+            if (!segs.length) segs.push({ days: [], topUp: false, manual: false });
+            segs[segs.length - 1].days.push(d);
+        });
         for (const s of segs) {
             s.start = s.days[0].day;
             s.end = s.days[s.days.length - 1].day;
@@ -83,7 +123,7 @@
         return { median, p90: vals[Math.floor(0.9 * n)], max: vals[n - 1], count: n };
     }
 
-    const api = { dailyMinimums, segments, summary, swingStats };
+    const api = { dailyMinimums, segments, summary, swingStats, parseEvents };
     global.PressureAnalysis = api;
     if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
