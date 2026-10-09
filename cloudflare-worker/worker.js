@@ -24,6 +24,7 @@ const CLIENT_ID    = 'myvaillant';
 const REDIRECT_URI = 'enduservaillant.page.link://login';
 const API_BASE     = 'https://api.vaillant-group.com/service-connected-control/end-user-app-api/v1';
 const REPO         = 'konradmakosa/vaillant';
+const ALTCHA_CHALLENGE_URL = 'https://identity.vaillant-group.com/api/altcha/challenge';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -105,6 +106,54 @@ async function generatePKCE() {
   return { verifier, challenge };
 }
 
+// ── ALTCHA proof-of-work solver ──────────────────────────────────
+function hexToBytes(hex) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+  return bytes;
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function solveAltcha(challenge) {
+  const p = challenge.parameters;
+  const nonce = hexToBytes(p.nonce);
+  const salt = hexToBytes(p.salt);
+  const keyPrefix = hexToBytes(p.keyPrefix);
+  const cost = p.cost;
+  const keyLength = p.keyLength ?? 32;
+  const hash = {
+    'PBKDF2/SHA-512': 'SHA-512',
+    'PBKDF2/SHA-384': 'SHA-384',
+  }[p.algorithm] ?? 'SHA-256';
+
+  const password = new Uint8Array(nonce.length + 4);
+  password.set(nonce, 0);
+  const view = new DataView(password.buffer);
+
+  for (let counter = 0; counter <= 200000; counter++) {
+    view.setUint32(nonce.length, counter, false);
+    const key = await crypto.subtle.importKey('raw', password, 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', hash, salt, iterations: cost },
+      key,
+      keyLength * 8
+    );
+    const derived = new Uint8Array(bits);
+    if (keyPrefix.every((b, i) => derived[i] === b)) {
+      return btoa(JSON.stringify({
+        challenge: { parameters: p, signature: challenge.signature },
+        solution: { counter, derivedKey: bytesToHex(derived), time: 0 },
+      }));
+    }
+  }
+  throw new Error('ALTCHA solution not found within iteration cap');
+}
+
 // ── Vaillant OAuth2 login ────────────────────────────────────────
 async function vaillantLogin(username, password) {
   const { verifier, challenge } = await generatePKCE();
@@ -150,6 +199,16 @@ async function vaillantLogin(username, password) {
     }
     const loginUrl = match[0].replace(/&amp;/g, '&');
 
+    // Fetch ALTCHA challenge (proof-of-work captcha on the login form);
+    // mirror myPyllant: continue without it on failure
+    const form = new URLSearchParams({ username, password, credentialId: '' });
+    try {
+      const r = await fetch(ALTCHA_CHALLENGE_URL, {
+        headers: { 'User-Agent': 'okhttp/4.9.2', 'Accept': 'application/json' },
+      });
+      if (r.ok) form.set('altcha', await solveAltcha(await r.json()));
+    } catch (_) {}
+
     // Step 2: POST credentials with session cookies
     const loginResp = await fetch(loginUrl, {
       method: 'POST',
@@ -158,13 +217,16 @@ async function vaillantLogin(username, password) {
         'User-Agent': 'okhttp/4.9.2',
         'Cookie': cookieHeader,
       },
-      body: new URLSearchParams({ username, password, credentialId: '' }),
+      body: form,
       redirect: 'manual',
     });
 
     const redirectUrl = loginResp.headers.get('Location');
     if (!redirectUrl) {
-      throw new Error('Login failed — no redirect (wrong credentials?)');
+      const failHtml = await loginResp.text();
+      const msgMatch = failHtml.match(/class="kc-feedback-text"[^>]*>([^<]*)</);
+      const msg = msgMatch ? msgMatch[1].trim() : '';
+      throw new Error(`Login failed — ${msg || 'no redirect (wrong credentials?)'}`);
     }
     const rUrl = new URL(redirectUrl);
     code = rUrl.searchParams.get('code');

@@ -1,2 +1,2 @@
-myPyllant
+myPyllant>=0.9.18
 tzdata

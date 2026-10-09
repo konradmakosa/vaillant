@@ -176,13 +176,20 @@ async def get_boiler_info(username, password, brand="vaillant", country="poland"
         print("\nPlease check your credentials and brand/country settings.")
 
 if __name__ == "__main__":
-    username = input("Enter your myVaillant username (email): ")
-    password = input("Enter your myVaillant password: ")
+    import os
+    from pathlib import Path
 
-    print(f"\nAvailable brands: {', '.join(BRANDS.keys())}")
-    brand = input(f"Enter brand [{DEFAULT_BRAND}]: ") or DEFAULT_BRAND
+    # Load .env
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            if "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
 
-    print(f"\nAvailable countries for {brand}: {', '.join(ALL_COUNTRIES.keys())}")
-    country = input("Enter country [poland]: ") or "poland"
+    username = os.environ.get("VAILLANT_USERNAME") or input("Enter your myVaillant username (email): ")
+    password = os.environ.get("VAILLANT_PASSWORD") or input("Enter your myVaillant password: ")
+    brand = os.environ.get("VAILLANT_BRAND", "vaillant")
+    country = os.environ.get("VAILLANT_COUNTRY", "poland")
 
     asyncio.run(get_boiler_info(username, password, brand, country))
