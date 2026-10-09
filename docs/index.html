@@ -394,6 +394,15 @@
         <div class="trend-summary" id="trend-summary"></div>
     </div>
 
+    <div class="chart-section" id="swing-section" style="display:none">
+        <div class="chart-title">Wahania dobowe ciśnienia — stan naczynia przeponowego</div>
+        <div class="chart-subtitle">Różnica między najwyższym a najniższym ciśnieniem w ciągu doby. Przy sprawnym naczyniu przeponowym to ok. 0.2–0.3 bar. Większe wahania = naczynie bez poduszki powietrznej, co wypycha ciśnienie w stronę zaworu bezpieczeństwa (3 bar) przy każdym grzaniu.</div>
+        <div class="chart-container" style="height:280px">
+            <canvas id="chart-swing"></canvas>
+        </div>
+        <div class="trend-summary" id="swing-summary"></div>
+    </div>
+
     <div class="chart-section">
         <div class="chart-title">Ciśnienie i temperatury — korelacja</div>
         <div class="chart-subtitle">Lewa oś: ciśnienie [bar] · Prawa oś: temperatury [°C] · Strefa ostrzegawcza ciśnienia < 1.0 bar</div>
@@ -830,8 +839,7 @@ function dayTs(day) {
 }
 
 // Cold-system pressure trend — always uses ALL data, ignores range filter
-function buildTrend() {
-    const dailyMins = PressureAnalysis.dailyMinimums(allData);
+function buildTrend(dailyMins) {
     const segs = PressureAnalysis.segments(dailyMins);
     const sumSegs = PressureAnalysis.summary(segs);
     const section = document.getElementById('trend-section');
@@ -929,6 +937,120 @@ function buildTrend() {
     }
 }
 
+// Plugin for the swing chart: green "norma 0.2–0.3 bar" band + median line
+const swingNormBand = {
+    id: 'swingNormBand',
+    beforeDraw(chart) {
+        const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+        if (!y) return;
+        ctx.save();
+        const yTop = y.getPixelForValue(0.3);
+        const yBot = y.getPixelForValue(0.2);
+        ctx.fillStyle = 'rgba(0, 166, 81, 0.15)';
+        ctx.fillRect(left, yTop, right - left, yBot - yTop);
+        ctx.fillStyle = 'rgba(0, 166, 81, 0.6)';
+        ctx.font = '10px system-ui';
+        ctx.fillText('norma 0.2–0.3 bar', left + 6, yTop - 4);
+        const median = chart.$median;
+        if (median != null) {
+            const ym = y.getPixelForValue(median);
+            ctx.strokeStyle = '#ff9800';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.moveTo(left, ym);
+            ctx.lineTo(right, ym);
+            ctx.stroke();
+            ctx.fillStyle = '#ff9800';
+            ctx.fillText(`mediana ${median.toFixed(2)} bar`, right - 110, ym - 4);
+        }
+        ctx.restore();
+    }
+};
+
+let swingChart = null;
+
+function medianOf(vals) {
+    if (!vals.length) return null;
+    const s = [...vals].sort((a, b) => a - b);
+    const n = s.length;
+    return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+}
+
+// Daily pressure swing (max - min) — expansion vessel health; uses ALL data
+function buildSwing(dailyMins) {
+    const section = document.getElementById('swing-section');
+    if (!dailyMins.length) { section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    const stats = PressureAnalysis.swingStats(dailyMins);
+    const isMobile = window.innerWidth < 600;
+
+    if (swingChart) swingChart.destroy();
+    const ctx = document.getElementById('chart-swing').getContext('2d');
+    swingChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            datasets: [{
+                label: 'Wahanie [bar]',
+                data: dailyMins.map(d => ({ x: dayTs(d.day), y: d.swing, d })),
+                backgroundColor: dailyMins.map(d =>
+                    d.swing > 1.5 ? 'rgba(136,136,170,0.5)' : 'rgba(255,152,0,0.7)'),
+                borderWidth: 0,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(26, 26, 46, 0.95)',
+                    borderColor: '#2a2a4a',
+                    borderWidth: 1,
+                    displayColors: false,
+                    callbacks: {
+                        title: items => items.length ? items[0].raw.d.day : '',
+                        label: item =>
+                            `wahanie ${item.raw.y.toFixed(1)} bar (min ${item.raw.d.min.toFixed(1)} / max ${item.raw.d.max.toFixed(1)})`,
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    time: { unit: 'day', tooltipFormat: 'yyyy-MM-dd', displayFormats: { day: 'dd.MM' } },
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#8888aa', maxRotation: 0, font: { size: isMobile ? 9 : 11 } }
+                },
+                y: {
+                    type: 'linear',
+                    min: 0,
+                    suggestedMax: 1.2,
+                    title: { display: !isMobile, text: 'Wahanie [bar]', color: '#ff9800', font: { size: 12, weight: '600' } },
+                    grid: { color: 'rgba(255, 152, 0, 0.08)' },
+                    ticks: { color: '#ff9800', font: { size: isMobile ? 8 : 11 } }
+                }
+            }
+        },
+        plugins: [swingNormBand]
+    });
+    swingChart.$median = stats ? stats.median : null;
+
+    const el = document.getElementById('swing-summary');
+    if (stats) {
+        let txt = `Mediana wahań dobowych: ${stats.median.toFixed(2)} bar · ` +
+            `90% dni poniżej ${stats.p90.toFixed(2)} bar · norma 0.2–0.3 bar`;
+        if (dailyMins.length >= 14) {
+            const last14 = medianOf(dailyMins.slice(-14).map(d => d.swing));
+            txt += ` · ostatnie 14 dni: ${last14.toFixed(2)} bar`;
+        }
+        el.textContent = txt;
+    } else {
+        el.textContent = '';
+    }
+}
+
 function refresh() {
     let filtered = filterByRange(allData, selectedRange);
     if (filtered.length === 0 && selectedRange !== 0) {
@@ -966,7 +1088,9 @@ function triggerDataLog() {
         return;
     }
     refresh();
-    buildTrend();
+    const dailyMins = PressureAnalysis.dailyMinimums(allData);
+    buildTrend(dailyMins);
+    buildSwing(dailyMins);
 })();
 </script>
 

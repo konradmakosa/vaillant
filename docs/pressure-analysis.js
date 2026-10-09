@@ -18,12 +18,14 @@
             const p = parseFloat(r.water_pressure_bar);
             if (!isFinite(p)) continue;
             const day = r._ts.toLocaleDateString('sv-SE', { timeZone: TZ });
-            const e = byDay[day] || (byDay[day] = { day, min: Infinity, n: 0 });
+            const e = byDay[day] || (byDay[day] = { day, min: Infinity, max: -Infinity, n: 0 });
             if (p < e.min) e.min = p;
+            if (p > e.max) e.max = p;
             e.n++;
         }
         return Object.values(byDay)
             .filter(d => d.n >= 3)
+            .map(d => ({ ...d, swing: +(d.max - d.min).toFixed(2) }))
             .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
     }
 
@@ -72,7 +74,16 @@
         return segs.filter(s => s.days.length >= 2);
     }
 
-    const api = { dailyMinimums, segments, summary };
+    // Stats over daily swing (max - min) values; null if no days.
+    function swingStats(dailyMins) {
+        const vals = dailyMins.map(d => d.swing).sort((a, b) => a - b);
+        const n = vals.length;
+        if (!n) return null;
+        const median = n % 2 ? vals[(n - 1) / 2] : (vals[n / 2 - 1] + vals[n / 2]) / 2;
+        return { median, p90: vals[Math.floor(0.9 * n)], max: vals[n - 1], count: n };
+    }
+
+    const api = { dailyMinimums, segments, summary, swingStats };
     global.PressureAnalysis = api;
     if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
