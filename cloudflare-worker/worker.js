@@ -13,6 +13,7 @@
  *   POST /cancel     — cancel DHW boost
  *   POST /data       — read boiler data (+ commit CSV to GitHub)
  *   POST /trigger    — legacy: GitHub repository_dispatch
+ *   cron 0 * * * *   — hourly GitHub repository_dispatch (log-data)
  *
  * Deploy: cd cloudflare-worker && npx wrangler deploy
  */
@@ -511,5 +512,11 @@ export default {
     } catch (e) {
       return json({ error: e.message }, 500);
     }
+  },
+
+  // Cron trigger (wrangler.toml [triggers]) — hourly GitHub repository_dispatch
+  // so data logging does not depend on GitHub's unreliable schedule
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(doTrigger('log-data', env));
   },
 };

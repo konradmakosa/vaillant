@@ -2,7 +2,8 @@ name: Vaillant Monitor
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    # fallback only — primary hourly trigger is the Cloudflare Worker cron (repository_dispatch)
+    - cron: '0 */6 * * *'
   repository_dispatch:
     types: [log-data]
   workflow_dispatch:

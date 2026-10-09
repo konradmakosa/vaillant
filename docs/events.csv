@@ -1,2 +1,3 @@
 timestamp_utc,type,pressure_before_bar,pressure_after_bar,note
 2026-10-09 10:20:00,topup,1.2,2.3,dolewka na zimno (godzina orientacyjna)
+2026-10-09 10:40:00,observation,,2.7,manometr po wlaczeniu grzania (dolewka do 2.3 na zimno)
