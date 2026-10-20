@@ -17,6 +17,7 @@ env:
   PRESSURE_WARNING: "1.2"
   PRESSURE_CRITICAL: "1.0"
   MIN_INTERVAL_SECONDS: "300"
+  WORKER_URL: https://vaillant-trigger.konrad-makosa.workers.dev
   PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
   PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
 

@@ -6,10 +6,10 @@ Designed to run every ~16 minutes via GitHub Actions.
 """
 import asyncio
 import csv
+import json
 import os
 import sys
 import logging
-import time
 import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
@@ -25,6 +25,8 @@ USERNAME = os.environ["VAILLANT_USERNAME"]
 PASSWORD = os.environ["VAILLANT_PASSWORD"]
 BRAND = os.environ.get("VAILLANT_BRAND", "vaillant")
 COUNTRY = os.environ.get("VAILLANT_COUNTRY", "poland")
+
+WORKER_URL = os.environ.get("WORKER_URL", "https://vaillant-trigger.konrad-makosa.workers.dev")
 
 PRESSURE_WARNING = float(os.environ.get("PRESSURE_WARNING", "1.0"))
 PRESSURE_CRITICAL = float(os.environ.get("PRESSURE_CRITICAL", "0.8"))
@@ -109,6 +111,41 @@ async def read_boiler_data():
                 "dhw": system.domestic_hot_water,
             }
     return rows, info
+
+
+def is_auth_blocked(e):
+    """True if the exception looks like a Vaillant WAF/auth block (403/LoginEndpointInvalid)."""
+    if type(e).__name__ == "LoginEndpointInvalid":
+        return True
+    msg = f"{e} {getattr(e, '__cause__', '')}"
+    return "403" in msg or "401" in msg
+
+
+def read_via_worker():
+    """Fallback read via the Cloudflare Worker (different egress IP than GitHub Actions).
+    The worker does login + ALTCHA itself. Returns (rows, info) like read_boiler_data()."""
+    req = urllib.request.Request(
+        f"{WORKER_URL}/data",
+        data=b'{"commit": false}',
+        headers={"Content-Type": "application/json", "User-Agent": "curl/8.0"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=90) as resp:
+        payload = json.load(resp)
+    if payload.get("status") != "ok":
+        raise RuntimeError(f"Worker /data failed: {payload}")
+    data = payload["data"]
+    data["timestamp"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    info = {
+        "pressure": data.get("water_pressure_bar"),
+        "outdoor_temp": data.get("outdoor_temp_c"),
+        "circuit_flow": data.get("circuit_flow_temp_c"),
+        "connected": data.get("connected"),
+        "system_name": "(worker fallback)",
+        "zones": [],
+        "dhw": [],
+    }
+    return [data], info
 
 
 def last_csv_line():
@@ -301,21 +338,24 @@ def main():
         logger.info("Skipping — too soon since last reading.")
         return
 
-    max_retries = 3
     rows, info = [], {}
-    for attempt in range(max_retries):
-        try:
-            rows, info = asyncio.run(read_boiler_data())
-            break
-        except Exception as e:
-            if ('403' in str(e) or '401' in str(e)) and attempt < max_retries - 1:
-                wait = 120 * (attempt + 1)
-                logger.warning(f"API quota exceeded, retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
-                time.sleep(wait)
-            else:
+    try:
+        rows, info = asyncio.run(read_boiler_data())
+    except Exception as e:
+        if is_auth_blocked(e):
+            # WAF/auth block on this IP — retrying won't help; read via the worker
+            logger.warning(f"Vaillant auth blocked ({type(e).__name__}: {e}) — falling back to worker")
+            try:
+                rows, info = read_via_worker()
+                logger.info("Reading obtained via Cloudflare Worker fallback")
+            except Exception as e2:
                 import traceback
-                logger.error(f"Failed to read boiler data: {e}\n{traceback.format_exc()}")
+                logger.error(f"Worker fallback failed: {e2}\n{traceback.format_exc()}")
                 sys.exit(1)
+        else:
+            import traceback
+            logger.error(f"Failed to read boiler data: {e}\n{traceback.format_exc()}")
+            sys.exit(1)
 
     if not rows:
         logger.error("No data retrieved from boiler.")

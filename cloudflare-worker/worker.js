@@ -317,7 +317,7 @@ async function doCancelBoost(accessToken) {
   return { status: 'ok', action: 'cancel' };
 }
 
-async function doReadData(accessToken, env) {
+async function doReadData(accessToken, env, commit = true) {
   const { systemId, controlId } = await getSystemInfo(accessToken);
   const url = systemUrl(systemId, controlId);
   const resp = await fetch(url, { headers: apiHeaders(accessToken) });
@@ -353,8 +353,9 @@ async function doReadData(accessToken, env) {
     dhw_current_special_function: dhw.state?.currentSpecialFunction ?? dhw.currentSpecialFunction ?? dhw.current_special_function ?? null,
   };
 
-  // Commit CSV row to GitHub if GITHUB_TOKEN is set
-  if (env.GITHUB_TOKEN) {
+  // Commit CSV row to GitHub if GITHUB_TOKEN is set (skipped when commit:false —
+  // used by the GitHub Actions fallback path, which writes the CSV itself)
+  if (commit && env.GITHUB_TOKEN) {
     try {
       await commitCsvRow(env.GITHUB_TOKEN, data);
     } catch (e) {
@@ -487,8 +488,10 @@ export default {
       return json({ error: 'Unknown endpoint', endpoints: ['/boost', '/cancel', '/data', '/trigger'] }, 404);
     }
 
-    // Cooldown check
-    const wait = await checkCooldown(action);
+    // Cooldown check (skipped for /data with {"commit": false} — GitHub Actions
+    // fallback path; it must never get a 429)
+    const skipCooldown = action === 'data' && body.commit === false;
+    const wait = skipCooldown ? 0 : await checkCooldown(action);
     if (wait) return json({ status: 'cooldown', action, retry_in: wait }, 429);
 
     // Vaillant credentials
@@ -505,9 +508,9 @@ export default {
       let result;
       if (action === 'boost')       result = await doBoost(accessToken);
       else if (action === 'cancel') result = await doCancelBoost(accessToken);
-      else if (action === 'data')   result = await doReadData(accessToken, env);
+      else if (action === 'data')   result = await doReadData(accessToken, env, body.commit !== false);
 
-      await setCooldown(action);
+      if (!skipCooldown) await setCooldown(action);
       return json(result);
     } catch (e) {
       return json({ error: e.message }, 500);
