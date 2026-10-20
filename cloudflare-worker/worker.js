@@ -514,7 +514,7 @@ export default {
     }
   },
 
-  // Cron trigger (wrangler.toml [triggers]) — hourly GitHub repository_dispatch
+  // Cron trigger (wrangler.toml [triggers]) — 10-min GitHub repository_dispatch
   // so data logging does not depend on GitHub's unreliable schedule
   async scheduled(event, env, ctx) {
     ctx.waitUntil(doTrigger('log-data', env));

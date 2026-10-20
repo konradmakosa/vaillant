@@ -2,7 +2,7 @@ name: Vaillant Monitor
 
 on:
   schedule:
-    # fallback only — primary hourly trigger is the Cloudflare Worker cron (repository_dispatch)
+    # fallback only — primary 10-min trigger is the Cloudflare Worker cron (repository_dispatch)
     - cron: '0 */6 * * *'
   repository_dispatch:
     types: [log-data]
@@ -16,6 +16,7 @@ env:
   VAILLANT_COUNTRY: poland
   PRESSURE_WARNING: "1.2"
   PRESSURE_CRITICAL: "1.0"
+  MIN_INTERVAL_SECONDS: "300"
   PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
   PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
 

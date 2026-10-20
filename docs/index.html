@@ -424,6 +424,9 @@
 <script src="pressure-analysis.js"></script>
 <script>
 const CSV_BASE_URL = 'https://raw.githubusercontent.com/konradmakosa/vaillant/main/data/';
+// Data before the 2026-10-09/10 top-ups is no longer relevant for diagnosis
+const DATA_START = '2026-10-10';
+const DATA_START_TS = Date.parse(DATA_START + 'T00:00:00Z');
 let allData = [];
 let allEvents = [];
 let combinedChart = null;
@@ -463,13 +466,16 @@ function parseCSV(text) {
 async function loadAllData() {
     const now = new Date();
     const months = [];
-    let y = 2026, m = 2; // data starts 2026-02
+    const d0 = new Date(DATA_START_TS);
+    let y = d0.getUTCFullYear(), m = d0.getUTCMonth() + 1; // data starts at DATA_START
     while (y < now.getFullYear() || (y === now.getFullYear() && m <= now.getMonth() + 1)) {
         months.push(`boiler_${y}-${String(m).padStart(2, '0')}.csv`);
         if (++m > 12) { m = 1; y++; }
     }
     const results = await Promise.all(months.map(fetchCSV));
-    allData = results.flat().sort((a, b) => a._ts - b._ts);
+    allData = results.flat()
+        .filter(r => r._ts >= DATA_START_TS)
+        .sort((a, b) => a._ts - b._ts);
 }
 
 function filterByRange(data, hours) {
@@ -591,10 +597,29 @@ const pressureWarningZone = {
 // top-up events (exact timestamp, distinct colour) on the charts
 const topUpLines = {
     id: 'topUpLines',
+    beforeDraw(chart) {
+        // shaded band for boiler isolation test (test_start..test_end / now)
+        const bands = chart.$testBands || [];
+        if (!bands.length) return;
+        const { ctx, chartArea: { top, bottom, left, right }, scales: { x } } = chart;
+        ctx.save();
+        for (const b of bands) {
+            const x1 = Math.max(left, x.getPixelForValue(b.x1));
+            const x2 = Math.min(right, x.getPixelForValue(b.x2));
+            if (x2 <= left || x1 >= right || x2 <= x1) continue;
+            ctx.fillStyle = 'rgba(255, 193, 7, 0.15)';
+            ctx.fillRect(x1, top, x2 - x1, bottom - top);
+            ctx.fillStyle = 'rgba(255, 193, 7, 0.7)';
+            ctx.font = '10px system-ui';
+            ctx.fillText('kocioł odcięty', x1 + 4, top + 34);
+        }
+        ctx.restore();
+    },
     afterDraw(chart) {
         const days = chart.$topUpDays || [];
         const events = chart.$topUpEvents || [];
-        if (!days.length && !events.length) return;
+        const services = chart.$serviceEvents || [];
+        if (!days.length && !events.length && !services.length) return;
         const { ctx, chartArea: { top, bottom, left, right }, scales: { x } } = chart;
         ctx.save();
         ctx.lineWidth = 1;
@@ -621,6 +646,17 @@ const topUpLines = {
             ctx.stroke();
             ctx.fillText(e.label || 'dolewka', px + 4, top + 22);
         }
+        ctx.strokeStyle = 'rgba(136, 136, 170, 0.8)';
+        ctx.fillStyle = 'rgba(136, 136, 170, 0.9)';
+        for (const s of services) {
+            const px = x.getPixelForValue(s.x);
+            if (px < left || px > right) continue;
+            ctx.beginPath();
+            ctx.moveTo(px, top);
+            ctx.lineTo(px, bottom);
+            ctx.stroke();
+            ctx.fillText(s.label, px + 4, top + 46);
+        }
         ctx.restore();
     }
 };
@@ -631,6 +667,28 @@ function topUpEventMarkers(events) {
         label: (e.before != null && e.after != null)
             ? `dolewka ${e.before}→${e.after} bar` : 'dolewka',
     }));
+}
+
+function serviceMarkers(events) {
+    return (events || []).filter(e => e.type === 'service').map(e => ({
+        x: e.ts.getTime(),
+        label: 'serwis' + (e.note ? ' ' + e.note : ''),
+    }));
+}
+
+function testBands(events) {
+    const sorted = [...(events || [])].sort((a, b) => a.ts - b.ts);
+    const bands = [];
+    let open = null;
+    for (const e of sorted) {
+        if (e.type === 'test_start' && !open) open = e;
+        else if (e.type === 'test_end' && open) {
+            bands.push({ x1: open.ts.getTime(), x2: e.ts.getTime() });
+            open = null;
+        }
+    }
+    if (open) bands.push({ x1: open.ts.getTime(), x2: Date.now() });
+    return bands;
 }
 
 function buildChart(data) {
@@ -852,6 +910,8 @@ function buildChart(data) {
         plugins: [pressureWarningZone, topUpLines]
     });
     combinedChart.$topUpEvents = topUpEventMarkers(allEvents);
+    combinedChart.$serviceEvents = serviceMarkers(allEvents);
+    combinedChart.$testBands = testBands(allEvents);
 }
 
 let trendChart = null;
@@ -940,6 +1000,8 @@ function buildTrend(dailyMins, manualTopUpDays) {
     });
     trendChart.$topUpDays = segs.filter(s => s.topUp && !s.manual).map(s => dayTs(s.start));
     trendChart.$topUpEvents = topUpEventMarkers(allEvents);
+    trendChart.$serviceEvents = serviceMarkers(allEvents);
+    trendChart.$testBands = testBands(allEvents);
 
     // Summary table
     const fmt = v => v.toFixed(2);
@@ -1107,7 +1169,7 @@ function triggerDataLog() {
     await loadAllData();
     allEvents = await fetch('events.csv?t=' + Date.now())
         .then(r => (r.ok ? r.text() : ''))
-        .then(PressureAnalysis.parseEvents)
+        .then(t => PressureAnalysis.parseEvents(t).filter(e => e.ts.getTime() >= DATA_START_TS))
         .catch(() => []);
     document.getElementById('loading').style.display = 'none';
     if (allData.length === 0) {
