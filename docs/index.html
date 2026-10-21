@@ -384,6 +384,14 @@
         <button class="btn" data-range="0">Wszystko</button>
     </div>
 
+    <div class="chart-section">
+        <div class="chart-title">Ciśnienie i temperatury — każdy odczyt</div>
+        <div class="chart-subtitle">Lewa oś: ciśnienie [bar] · Prawa oś: temperatury [°C] · Strefa ostrzegawcza ciśnienia < 1.0 bar</div>
+        <div class="chart-container">
+            <canvas id="chart-combined"></canvas>
+        </div>
+    </div>
+
     <div class="chart-section" id="trend-section" style="display:none">
         <div class="chart-title">Ciśnienie zimnej instalacji — trend ubytku wody</div>
         <div class="chart-subtitle">Odczyty w ciągu doby wahają się o 0.5–1.0 bar wraz z temperaturą wody. Dobowe minimum ≈ ciśnienie zimnej instalacji — pokazuje faktyczny ubytek. Skok w górę = dolewka.</div>
@@ -402,18 +410,10 @@
         </div>
         <div class="trend-summary" id="swing-summary"></div>
     </div>
-
-    <div class="chart-section">
-        <div class="chart-title">Ciśnienie i temperatury — korelacja</div>
-        <div class="chart-subtitle">Lewa oś: ciśnienie [bar] · Prawa oś: temperatury [°C] · Strefa ostrzegawcza ciśnienia < 1.0 bar</div>
-        <div class="chart-container">
-            <canvas id="chart-combined"></canvas>
-        </div>
-    </div>
 </div>
 
 <div class="footer">
-    Vaillant Remote Diagnostics · Dane odświeżane co 10 min · Kontakt: konrad@makosa.org
+    Vaillant Remote Diagnostics · Dane odświeżane co godzinę · Kontakt: konrad@makosa.org
 </div>
 
 <div class="loading" id="loading">
@@ -932,6 +932,7 @@ function buildTrend(dailyMins, manualTopUpDays) {
     const isMobile = window.innerWidth < 600;
     const datasets = [{
         label: 'Dobowe minimum [bar]',
+        yAxisID: 'yPressure',
         data: dailyMins.map(d => ({ x: dayTs(d.day), y: d.min, d })),
         borderColor: '#00bcd4',
         backgroundColor: '#00bcd4',
@@ -944,6 +945,7 @@ function buildTrend(dailyMins, manualTopUpDays) {
     for (const s of segs) {
         datasets.push({
             label: `Trend ${s.start}`,
+            yAxisID: 'yPressure',
             data: [
                 { x: dayTs(s.start), y: s.intercept },
                 { x: dayTs(s.end), y: s.intercept + s.slopePerDay * s.spanDays },
@@ -1147,6 +1149,25 @@ function refresh() {
     }
     updateLiveValues(filtered);
     buildChart(filtered);
+    applyDailyRange(trendChart);
+    applyDailyRange(swingChart);
+}
+
+// Daily charts (trend, swing) are computed from all data (regression needs full segments);
+// the range only sets the visible window — at least 7 days, since one point = one day
+const MIN_DAILY_WINDOW_H = 7 * 24;
+function applyDailyRange(chart) {
+    if (!chart) return;
+    const x = chart.options.scales.x;
+    if (selectedRange === 0) {
+        x.min = undefined;
+        x.max = undefined;
+    } else {
+        const now = Date.now();
+        x.min = now - Math.max(selectedRange, MIN_DAILY_WINDOW_H) * 3600 * 1000;
+        x.max = now + 12 * 3600 * 1000;
+    }
+    chart.update('none');
 }
 
 document.querySelectorAll('.btn[data-range]').forEach(btn => {
@@ -1177,10 +1198,10 @@ function triggerDataLog() {
         document.getElementById('loading').innerHTML = '<p>Brak danych. Poczekaj na pierwsze odczyty.</p>';
         return;
     }
-    refresh();
     const dailyMins = PressureAnalysis.dailyMinimums(allData);
     buildTrend(dailyMins, allEvents.filter(e => e.type === 'topup').map(e => e.day));
     buildSwing(dailyMins);
+    refresh();
 })();
 </script>
 
