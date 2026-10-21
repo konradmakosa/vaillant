@@ -26,6 +26,7 @@ PASSWORD = os.environ["VAILLANT_PASSWORD"]
 BRAND = os.environ.get("VAILLANT_BRAND", "vaillant")
 COUNTRY = os.environ.get("VAILLANT_COUNTRY", "poland")
 
+STALE_FAIL_SECONDS = int(os.environ.get("STALE_FAIL_SECONDS", "7200"))  # fail (→ e-mail) only after 2 h without data
 WORKER_URL = os.environ.get("WORKER_URL", "https://vaillant-trigger.konrad-makosa.workers.dev")
 
 PRESSURE_WARNING = float(os.environ.get("PRESSURE_WARNING", "1.0"))
@@ -63,8 +64,6 @@ async def read_boiler_data():
     async with MyPyllantAPI(USERNAME, PASSWORD, BRAND, COUNTRY) as api:
         async for system in api.get_systems(
             include_connection_status=True,
-            include_rts=True,
-            include_mpc=True,
         ):
             now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
             pressure = system.water_pressure
@@ -338,10 +337,24 @@ def main():
         logger.info("Skipping — too soon since last reading.")
         return
 
+    def fail_soft(msg):
+        # a single missed reading is not worth a failure e-mail; fail the run only
+        # when the data gap gets long (then GitHub's failure e-mail is meaningful)
+        prev_ts, _ = previous_reading()
+        gap = (datetime.now(timezone.utc) - prev_ts).total_seconds() if prev_ts else None
+        if gap is not None and gap < STALE_FAIL_SECONDS:
+            logger.warning(f"{msg} — skipping this reading (last reading {gap / 60:.0f} min ago)")
+            sys.exit(0)
+        logger.error(f"{msg} — no reading for {'?' if gap is None else f'{gap / 3600:.1f} h'}")
+        sys.exit(1)
+
     rows, info = [], {}
     try:
         rows, info = asyncio.run(read_boiler_data())
     except Exception as e:
+        if "Quota" in f"{e} {e.__cause__}":
+            # per-account API quota — the worker uses the same account, fallback would fail too
+            fail_soft(f"Vaillant API quota exceeded ({e})")
         if is_auth_blocked(e):
             # WAF/auth block on this IP — retrying won't help; read via the worker
             logger.warning(f"Vaillant auth blocked ({type(e).__name__}: {e}) — falling back to worker")
@@ -349,9 +362,7 @@ def main():
                 rows, info = read_via_worker()
                 logger.info("Reading obtained via Cloudflare Worker fallback")
             except Exception as e2:
-                import traceback
-                logger.error(f"Worker fallback failed: {e2}\n{traceback.format_exc()}")
-                sys.exit(1)
+                fail_soft(f"Worker fallback failed: {e2}")
         else:
             import traceback
             logger.error(f"Failed to read boiler data: {e}\n{traceback.format_exc()}")
